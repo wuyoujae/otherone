@@ -1,0 +1,18 @@
+appId: com.otherone.app
+productName: OtherOne
+directories:
+  output: dist-electron
+  buildResources: resources
+files:
+  - electron/dist/**/*
+  - "!electron/dist/**/*.map"
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage

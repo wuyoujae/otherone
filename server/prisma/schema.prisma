@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @db.Uuid
+  displayName  String   @map("display_name") @db.VarChar(100)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  avatarUrl    String?  @map("avatar_url") @db.VarChar(500)
+  githubId     String?  @unique @map("github_id") @db.VarChar(100)
+  status       Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("user")
+}
+
+model Project {
+  id            String   @id @db.Uuid
+  name          String   @db.VarChar(255)
+  description   String?  @db.Text
+  tag           String?  @db.VarChar(100)
+  icon          String   @default("Box") @db.VarChar(50)
+  status        Int      @default(0)
+  aiStatus      Int      @default(0) @map("ai_status")
+  aiStatusText  String?  @map("ai_status_text") @db.VarChar(500)
+  aiAgentName   String?  @map("ai_agent_name") @db.VarChar(100)
+  progress      Int      @default(0)
+  systemPrompt  String?  @map("system_prompt") @db.Text
+  userId        String?  @map("user_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("project")
+}
+
+model ProjectMember {
+  id           String   @id @db.Uuid
+  projectId    String   @map("project_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  memberType   Int      @map("member_type")
+  displayLabel String   @map("display_label") @db.VarChar(50)
+  role         Int      @default(3)
+  joinedAt     DateTime @default(now()) @map("joined_at") @db.Timestamptz()
+
+  @@map("project_member")
+}
+
+model Craft {
+  id        String   @id @db.Uuid
+  projectId String   @unique @map("project_id") @db.Uuid
+  title     String?  @db.VarChar(500)
+  content   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("craft")
+}
+
+model CraftNode {
+  id        String   @id @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  nodeType  Int      @map("node_type")
+  content   String?  @db.Text
+  sortOrder Int      @default(0) @map("sort_order")
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("craft_node")
+}
+
+model TodoModule {
+  id        String   @id @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  color     String?  @db.VarChar(20)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("todo_module")
+}
+
+model TodoItem {
+  id          String    @id @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  moduleId    String?   @map("module_id") @db.Uuid
+  title       String    @db.VarChar(500)
+  description String?   @db.Text
+  content     String?   @db.Text
+  status      Int       @default(1)
+  priority    Int       @default(2)
+  assigneeId  String?   @map("assignee_id") @db.Uuid
+  dueDate     DateTime? @map("due_date") @db.Timestamptz()
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  startTime   String?   @map("start_time") @db.VarChar(5)
+  endTime     String?   @map("end_time") @db.VarChar(5)
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("todo_item")
+}
+
+model KbArticle {
+  id        String   @id @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  title     String   @db.VarChar(500)
+  content   String?  @db.Text
+  category  String?  @db.VarChar(100)
+  status    Int      @default(0)
+  fileUrl   String?  @map("file_url") @db.VarChar(1000)
+  fileType  String?  @map("file_type") @db.VarChar(50)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  @@map("kb_article")
+}
