@@ -9,6 +9,7 @@ import {
   showFloatingBallWindow,
   resizeFloatingBallWindow,
 } from './floating-ball';
+import { setupAutoUpdater, checkForUpdatesOnLaunch } from './auto-updater';
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.NEXT_DEV_URL || 'http://localhost:3002';
@@ -116,7 +117,9 @@ function registerFloatingBallIPC(): void {
 
 app.whenReady().then(() => {
   registerFloatingBallIPC();
+  setupAutoUpdater();
   createWindow();
+  checkForUpdatesOnLaunch();
 
   // Restore floating ball if previously enabled (hidden initially since main window is focused)
   const config = readConfig();

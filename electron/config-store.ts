@@ -5,11 +5,13 @@ import * as path from 'path';
 interface AppConfig {
   floatingBallEnabled: boolean;
   floatingBallPosition: { x: number; y: number } | null;
+  autoCheckUpdates: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   floatingBallEnabled: false,
   floatingBallPosition: null,
+  autoCheckUpdates: true,
 };
 
 function getConfigPath(): string {

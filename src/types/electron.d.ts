@@ -1,4 +1,4 @@
-interface ElectronAPI {
+export interface ElectronAPI {
   platform: string;
   versions: {
     node: string;
@@ -16,5 +16,3 @@ declare global {
     electronAPI?: ElectronAPI;
   }
 }
-
-export {};

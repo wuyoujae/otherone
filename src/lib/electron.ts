@@ -1,3 +1,5 @@
+import type { ElectronAPI } from '@/types/electron';
+
 export function isElectron(): boolean {
   return typeof window !== 'undefined' && !!window.electronAPI;
 }

@@ -17,12 +17,22 @@ import {
   Globe,
   Keyboard,
   Cpu,
+  Info,
+  RefreshCw,
+  Download,
+  RotateCcw,
+  Check,
+  AlertCircle,
+  Loader2,
+  ExternalLink,
+  ScrollText,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { isElectron, getElectronAPI } from '@/lib/electron';
+import type { UpdateStatus, UpdateStatusPayload } from '@/types/update';
 
-type NavKey = 'account' | 'preferences' | 'shortcuts' | 'modelApi';
+type NavKey = 'account' | 'preferences' | 'shortcuts' | 'modelApi' | 'about';
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
@@ -42,6 +52,12 @@ export default function SettingsPage() {
       title: t('groupAi'),
       items: [
         { key: 'modelApi' as NavKey, label: t('navModelApi'), icon: Cpu },
+      ],
+    },
+    {
+      title: t('groupAbout') || 'About',
+      items: [
+        { key: 'about' as NavKey, label: t('navAbout'), icon: Info },
       ],
     },
   ];
@@ -97,6 +113,7 @@ export default function SettingsPage() {
           {activeNav === 'preferences' && <PreferencesSection />}
           {activeNav === 'shortcuts' && <ShortcutsSection />}
           {activeNav === 'modelApi' && <ModelApiSection />}
+          {activeNav === 'about' && <AboutSection />}
         </div>
       </div>
     </div>
@@ -640,5 +657,370 @@ function ProviderCard({
         </button>
       </div>
     </div>
+  );
+}
+
+/* ============ About ============ */
+const OPEN_SOURCE_DEPS: { name: string; license: string; url: string }[] = [
+  { name: 'Next.js', license: 'MIT', url: 'https://github.com/vercel/next.js' },
+  { name: 'React', license: 'MIT', url: 'https://github.com/facebook/react' },
+  { name: 'React DOM', license: 'MIT', url: 'https://github.com/facebook/react' },
+  { name: 'Electron', license: 'MIT', url: 'https://github.com/electron/electron' },
+  { name: 'electron-builder', license: 'MIT', url: 'https://github.com/electron-userland/electron-builder' },
+  { name: 'electron-updater', license: 'MIT', url: 'https://github.com/electron-userland/electron-builder' },
+  { name: 'TypeScript', license: 'Apache-2.0', url: 'https://github.com/microsoft/TypeScript' },
+  { name: 'Tailwind CSS', license: 'MIT', url: 'https://github.com/tailwindlabs/tailwindcss' },
+  { name: 'PostCSS', license: 'MIT', url: 'https://github.com/postcss/postcss' },
+  { name: 'Autoprefixer', license: 'MIT', url: 'https://github.com/postcss/autoprefixer' },
+  { name: 'Axios', license: 'MIT', url: 'https://github.com/axios/axios' },
+  { name: 'next-intl', license: 'MIT', url: 'https://github.com/amannn/next-intl' },
+  { name: 'Lucide React', license: 'ISC', url: 'https://github.com/lucide-icons/lucide' },
+  { name: 'Tiptap (Editor)', license: 'MIT', url: 'https://github.com/ueberdosis/tiptap' },
+  { name: 'tiptap-markdown', license: 'MIT', url: 'https://github.com/aguingand/tiptap-markdown' },
+  { name: 'lowlight', license: 'MIT', url: 'https://github.com/wooorm/lowlight' },
+  { name: 'ProseMirror', license: 'MIT', url: 'https://github.com/ProseMirror/prosemirror' },
+  { name: 'ESLint', license: 'MIT', url: 'https://github.com/eslint/eslint' },
+  { name: 'concurrently', license: 'MIT', url: 'https://github.com/open-cli-tools/concurrently' },
+  { name: 'wait-on', license: 'MIT', url: 'https://github.com/jeffbski/wait-on' },
+];
+
+function OpenSourceModal({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('settings');
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
+
+      {/* Modal */}
+      <div
+        className="relative w-full max-w-2xl max-h-[80vh] bg-surface rounded-2xl border border-[var(--border)] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-surface-subtle border border-[var(--border)] flex items-center justify-center">
+              <ScrollText size={18} className="text-foreground-muted" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">{t('openSourceTitle')}</h3>
+              <p className="text-xs text-foreground-muted mt-0.5">{t('openSourceDesc')}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-subtle transition-all"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* List */}
+        <div className="overflow-y-auto flex-1 p-2">
+          {OPEN_SOURCE_DEPS.map((dep, idx) => (
+            <div
+              key={dep.name}
+              className={cn(
+                'flex items-center justify-between px-4 py-3 rounded-xl transition-colors hover:bg-surface-subtle',
+                idx < OPEN_SOURCE_DEPS.length - 1 && 'border-b border-[var(--border)]'
+              )}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-sm font-medium truncate">{dep.name}</span>
+                <span className="px-2 py-0.5 rounded-md bg-surface-subtle border border-[var(--border)] text-[11px] font-mono text-foreground-muted flex-shrink-0">
+                  {dep.license}
+                </span>
+              </div>
+              <a
+                href={dep.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-foreground-lighter hover:text-foreground transition-colors flex-shrink-0 ml-3"
+              >
+                <ExternalLink size={12} />
+              </a>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="h-9 px-5 rounded-lg bg-foreground text-white text-sm font-medium transition-all hover:opacity-90"
+          >
+            {t('ossClose')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AboutSection() {
+  const t = useTranslations('settings');
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [showOssModal, setShowOssModal] = useState(false);
+
+  // Auto-update state
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
+  const [updateVersion, setUpdateVersion] = useState('');
+  const [downloadPercent, setDownloadPercent] = useState(0);
+  const [updateError, setUpdateError] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    const desktop = isElectron();
+    setIsDesktop(desktop);
+    if (desktop) {
+      const api = getElectronAPI();
+      if (api) {
+        api.invoke('app-update:get-version').then((v: unknown) => {
+          if (typeof v === 'string') setAppVersion(v);
+        });
+        api.invoke('app-update:get-config').then((cfg: unknown) => {
+          const config = cfg as { autoCheckUpdates: boolean } | null;
+          if (config) setAutoUpdateEnabled(config.autoCheckUpdates);
+        });
+      }
+    }
+  }, []);
+
+  // Listen to update status events
+  useEffect(() => {
+    if (!isDesktop) return;
+    const api = getElectronAPI();
+    if (!api) return;
+    const handler = (...args: unknown[]) => {
+      const payload = args[0] as UpdateStatusPayload | undefined;
+      if (!payload) return;
+      setUpdateStatus(payload.status);
+      if (payload.version) setUpdateVersion(payload.version);
+      if (payload.percent !== undefined) setDownloadPercent(payload.percent);
+      if (payload.error) setUpdateError(payload.error);
+    };
+    api.on('app-update:status', handler);
+    return () => {
+      api.removeAllListeners('app-update:status');
+    };
+  }, [isDesktop]);
+
+  const toggleAutoUpdate = useCallback(() => {
+    const newVal = !autoUpdateEnabled;
+    setAutoUpdateEnabled(newVal);
+    const api = getElectronAPI();
+    if (api) {
+      api.send('app-update:toggle-auto', { enabled: newVal });
+    }
+  }, [autoUpdateEnabled]);
+
+  const handleCheckUpdate = useCallback(() => {
+    const api = getElectronAPI();
+    if (api) {
+      api.send('app-update:check', {});
+    }
+  }, []);
+
+  const handleDownload = useCallback(() => {
+    const api = getElectronAPI();
+    if (api) {
+      api.send('app-update:download', {});
+    }
+  }, []);
+
+  const handleRestart = useCallback(() => {
+    const api = getElectronAPI();
+    if (api) {
+      api.send('app-update:restart', {});
+    }
+  }, []);
+
+  return (
+    <section>
+      <h2 className="text-2xl font-semibold tracking-tight mb-8">{t('aboutTitle')}</h2>
+
+      {/* App info */}
+      <div className="py-5 border-b border-[var(--border)]">
+        <div className="flex items-center gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-foreground text-white flex items-center justify-center text-xl font-bold flex-shrink-0">
+            O
+          </div>
+          <div>
+            <div className="text-lg font-semibold">OtherOne</div>
+            <div className="text-sm text-foreground-muted font-mono mt-0.5">
+              v{appVersion || '0.1.0'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Auto Update - Desktop only */}
+      {isDesktop && (
+        <>
+          {/* Auto-check toggle */}
+          <div className="py-5 border-b border-[var(--border)]">
+            <div className="flex justify-between items-center gap-10">
+              <div>
+                <div className="text-base font-medium mb-1">{t('autoUpdate')}</div>
+                <div className="text-sm text-foreground-muted">{t('autoUpdateDesc')}</div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={autoUpdateEnabled}
+                  onChange={toggleAutoUpdate}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-[22px] relative">
+                  <span className="switch-slider" />
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Version & manual check */}
+          <div className="py-5 border-b border-[var(--border)]">
+            <div className="flex justify-between items-center gap-10">
+              <div>
+                <div className="text-base font-medium mb-1">{t('currentVersion')}</div>
+                <div className="text-sm text-foreground-muted font-mono">v{appVersion || '...'}</div>
+              </div>
+              <button
+                onClick={handleCheckUpdate}
+                disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+                className={cn(
+                  'flex items-center gap-2 h-9 px-4 rounded-lg border text-sm font-medium transition-all',
+                  updateStatus === 'checking' || updateStatus === 'downloading'
+                    ? 'border-[var(--border)] text-foreground-lighter cursor-not-allowed'
+                    : 'border-[var(--border-strong)] text-foreground-muted hover:border-foreground hover:text-foreground hover:bg-surface-subtle'
+                )}
+              >
+                {updateStatus === 'checking' ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                {updateStatus === 'checking' ? t('updateChecking') : t('checkUpdate')}
+              </button>
+            </div>
+
+            {/* Update status feedback */}
+            {updateStatus === 'available' && (
+              <div className="mt-4 p-4 rounded-xl bg-surface-subtle border border-[var(--border)] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Download size={16} className="text-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">{t('updateAvailable')}</div>
+                      <div className="text-xs text-foreground-muted mt-0.5">
+                        {t('updateAvailableDesc', { version: updateVersion })}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-foreground text-white text-sm font-medium transition-all hover:opacity-90"
+                  >
+                    <Download size={13} />
+                    {t('downloadUpdate')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {updateStatus === 'downloading' && (
+              <div className="mt-4 p-4 rounded-xl bg-surface-subtle border border-[var(--border)] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <Loader2 size={16} className="animate-spin text-foreground" />
+                  <div className="text-sm font-medium">{t('updateDownloading')}</div>
+                  <span className="text-xs text-foreground-muted font-mono ml-auto">{downloadPercent}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-foreground rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${downloadPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {updateStatus === 'downloaded' && (
+              <div className="mt-4 p-4 rounded-xl bg-surface-subtle border border-[var(--border)] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Check size={16} className="text-green-600" />
+                    <div>
+                      <div className="text-sm font-medium">{t('updateDownloaded')}</div>
+                      <div className="text-xs text-foreground-muted mt-0.5">{t('updateDownloadedDesc')}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setUpdateStatus('idle')}
+                      className="h-8 px-3 rounded-lg border border-[var(--border-strong)] text-sm text-foreground-muted transition-all hover:text-foreground hover:border-foreground"
+                    >
+                      {t('restartLater')}
+                    </button>
+                    <button
+                      onClick={handleRestart}
+                      className="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-foreground text-white text-sm font-medium transition-all hover:opacity-90"
+                    >
+                      <RotateCcw size={13} />
+                      {t('restartNow')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {updateStatus === 'not-available' && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-foreground-muted animate-in fade-in duration-200">
+                <Check size={14} className="text-green-600" />
+                {t('updateNotAvailable')}
+              </div>
+            )}
+
+            {updateStatus === 'error' && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-red-500 animate-in fade-in duration-200">
+                <AlertCircle size={14} />
+                {t('updateError')}{updateError ? `: ${updateError}` : ''}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Open Source */}
+      <div className="py-5 border-b border-[var(--border)]">
+        <div className="flex justify-between items-center gap-10">
+          <div>
+            <div className="text-base font-medium mb-1">{t('openSourceTitle')}</div>
+            <div className="text-sm text-foreground-muted">{t('openSourceDesc')}</div>
+          </div>
+          <button
+            onClick={() => setShowOssModal(true)}
+            className="flex items-center gap-2 h-9 px-4 rounded-lg border border-[var(--border-strong)] text-sm font-medium text-foreground-muted transition-all hover:border-foreground hover:text-foreground hover:bg-surface-subtle flex-shrink-0"
+          >
+            <ScrollText size={14} />
+            {t('openSourceBtn')}
+          </button>
+        </div>
+      </div>
+
+      {showOssModal && <OpenSourceModal onClose={() => setShowOssModal(false)} />}
+    </section>
   );
 }

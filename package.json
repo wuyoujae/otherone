@@ -12,7 +12,8 @@
     "start": "next start -p 3002",
     "lint": "next lint",
     "electron:compile": "tsc -p tsconfig.electron.json",
-    "package:desktop": "npm run build:desktop && electron-builder"
+    "package:desktop": "npm run build:desktop && electron-builder",
+    "publish:desktop": "npm run build:desktop && electron-builder --publish always"
   },
   "dependencies": {
     "@tiptap/extension-code-block-lowlight": "^2.27.2",
@@ -37,6 +38,7 @@
     "@tiptap/react": "^2.27.2",
     "@tiptap/starter-kit": "^2.27.2",
     "axios": "^1.7.9",
+    "electron-updater": "^6.8.3",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
@@ -49,6 +51,8 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.2.1",
     "electron": "^41.0.2",

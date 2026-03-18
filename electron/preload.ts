@@ -4,14 +4,21 @@ const allowedSendChannels: string[] = [
   'floating-ball:toggle',
   'floating-ball:resize',
   'floating-ball:position-save',
+  'app-update:check',
+  'app-update:download',
+  'app-update:restart',
+  'app-update:toggle-auto',
 ];
 const allowedReceiveChannels: string[] = [
   'floating-ball:toggled',
   'floating-ball:brightness',
   'floating-ball:layout',
+  'app-update:status',
 ];
 const allowedInvokeChannels: string[] = [
   'floating-ball:sample-brightness',
+  'app-update:get-version',
+  'app-update:get-config',
 ];
 
 contextBridge.exposeInMainWorld('electronAPI', {

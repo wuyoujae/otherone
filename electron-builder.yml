@@ -6,10 +6,16 @@ directories:
 files:
   - electron/dist/**/*
   - "!electron/dist/**/*.map"
+publish:
+  provider: github
+  owner: wuyoujae
+  repo: otherone
 mac:
   category: public.app-category.developer-tools
+  identity: null
   target:
     - dmg
+    - zip
 win:
   target:
     - nsis
