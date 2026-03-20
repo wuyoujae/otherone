@@ -7,6 +7,10 @@ interface AppConfig {
   floatingBallPosition: { x: number; y: number } | null;
   autoCheckUpdates: boolean;
   logDirectory: string | null;
+  authSession: {
+    token: string | null;
+    user: Record<string, unknown> | null;
+  } | null;
   databaseConfig: {
     host: string;
     port: number;
@@ -21,6 +25,7 @@ const DEFAULT_CONFIG: AppConfig = {
   floatingBallPosition: null,
   autoCheckUpdates: true,
   logDirectory: null,
+  authSession: null,
   databaseConfig: null,
 };
 

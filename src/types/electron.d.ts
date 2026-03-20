@@ -19,6 +19,11 @@ export interface LogDirectoryConfig {
   isDefault: boolean;
 }
 
+export interface AuthSession {
+  token: string | null;
+  user: Record<string, unknown> | null;
+}
+
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;

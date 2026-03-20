@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useMessage } from '@/components/ui/message/message-provider';
+import { persistDesktopAuthSession, writeBrowserAuthSession } from '@/lib/auth-session';
 import http from '@/lib/http';
 
 type AuthMode = 'login' | 'register';
@@ -48,8 +49,8 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      writeBrowserAuthSession(token, user);
+      await persistDesktopAuthSession(token, user);
       message.success(isLogin ? t('loginSuccess') : t('registerSuccess'));
 
       setTimeout(() => {

@@ -2,18 +2,34 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { hydrateAuthSession } from '@/lib/auth-session';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.replace('/login');
-    } else {
+    let active = true;
+
+    const checkAuth = async () => {
+      const session = await hydrateAuthSession();
+      if (!active) {
+        return;
+      }
+
+      if (!session?.token) {
+        router.replace('/login');
+        return;
+      }
+
       setAuthorized(true);
-    }
+    };
+
+    void checkAuth();
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   if (!authorized) {

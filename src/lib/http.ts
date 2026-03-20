@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearBrowserAuthSession, clearDesktopAuthSession, getStoredToken, hydrateAuthSession } from '@/lib/auth-session';
 
 let errorHandler: ((message: string) => void) | null = null;
 
@@ -18,9 +19,14 @@ const http = axios.create({
 });
 
 http.interceptors.request.use(
-  (config) => {
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  async (config) => {
+    let token = typeof window !== 'undefined' ? getStoredToken() : null;
+
+    if (!token && typeof window !== 'undefined') {
+      const session = await hydrateAuthSession();
+      token = session?.token ?? null;
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -31,12 +37,12 @@ http.interceptors.request.use(
 
 http.interceptors.response.use(
   (response) => response.data,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
 
     if (status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      clearBrowserAuthSession();
+      await clearDesktopAuthSession();
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
       }

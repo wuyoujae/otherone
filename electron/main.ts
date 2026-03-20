@@ -453,6 +453,25 @@ function registerAppConfigIPC(): void {
 
     return { success: true };
   });
+
+  ipcMain.handle('app-auth:get-session', () => {
+    return readConfig().authSession;
+  });
+
+  ipcMain.handle('app-auth:set-session', (_event, data: {
+    token: string | null;
+    user: Record<string, unknown> | null;
+  }) => {
+    const token = typeof data?.token === 'string' && data.token.length > 0 ? data.token : null;
+    const user = data?.user && typeof data.user === 'object' ? data.user : null;
+    writeConfig('authSession', { token, user });
+    return { success: true };
+  });
+
+  ipcMain.handle('app-auth:clear-session', () => {
+    writeConfig('authSession', null);
+    return { success: true };
+  });
 }
 
 app.whenReady().then(() => {

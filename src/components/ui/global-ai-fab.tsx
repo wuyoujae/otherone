@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { hydrateAuthSession, onAuthChanged } from '@/lib/auth-session';
 import { AnimatedLogo } from '@/components/ui/animated-logo';
 import { AiChatPanel } from '@/components/ui/ai-chat-panel';
 
@@ -14,11 +15,24 @@ export function GlobalAiFab() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setAuthed(!!localStorage.getItem('token'));
-    setMounted(true);
+    let active = true;
+    const syncAuth = async () => {
+      const session = await hydrateAuthSession();
+      if (!active) return;
+      setAuthed(!!session?.token);
+      setMounted(true);
+    };
+
+    void syncAuth();
+
     const onStorage = () => setAuthed(!!localStorage.getItem('token'));
+    const offAuthChanged = onAuthChanged(() => setAuthed(!!localStorage.getItem('token')));
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => {
+      active = false;
+      offAuthChanged();
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   useEffect(() => {
