@@ -34,6 +34,64 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function runDatabaseSchemaUpgrade(serverCwd: string, databaseUrl: string): Promise<void> {
+  const upgradeEntry = path.join(serverCwd, 'scripts', 'ensure-schema.js');
+  const recentOutput: string[] = [];
+  const nodePath = buildNodePath(
+    path.join(serverCwd, '..', 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar', 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules'),
+  );
+
+  logInfo('db-upgrade', 'Running database schema upgrade', { upgradeEntry });
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(process.execPath, [upgradeEntry], {
+      cwd: serverCwd,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_ENV: 'production',
+        DATABASE_URL: databaseUrl,
+        NODE_PATH: nodePath,
+      },
+      stdio: 'pipe',
+    });
+
+    const capture = (chunk: Buffer | string, isError = false) => {
+      const message = chunk.toString().trim();
+      if (!message) {
+        return;
+      }
+
+      recentOutput.push(message);
+      if (recentOutput.length > 20) {
+        recentOutput.shift();
+      }
+
+      if (isError) {
+        logError('db-upgrade', message);
+      } else {
+        logInfo('db-upgrade', message);
+      }
+    };
+
+    child.stdout?.on('data', (chunk) => capture(chunk));
+    child.stderr?.on('data', (chunk) => capture(chunk, true));
+
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      const details = recentOutput.length > 0 ? ` Recent output: ${recentOutput[recentOutput.length - 1]}` : '';
+      reject(new Error(`Database schema upgrade failed (code: ${code ?? 'unknown'}, signal: ${signal ?? 'none'}).${details}`));
+    });
+  });
+}
+
 async function findAvailablePort(startPort = 3002): Promise<number> {
   const maxAttempts = 20;
 
@@ -165,6 +223,13 @@ async function ensureApiBaseUrl(): Promise<string> {
   );
 
   apiBaseUrl = `http://127.0.0.1:${port}/api`;
+
+  if (databaseUrl) {
+    await runDatabaseSchemaUpgrade(serverCwd, databaseUrl);
+  } else {
+    logInfo('db-upgrade', 'Skipping database schema upgrade because no database is configured');
+  }
+
   logInfo('api-server', 'Starting embedded API server', { serverEntry, port, nodePath });
 
   apiServerProcess = spawn(process.execPath, [serverEntry], {
