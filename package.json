@@ -1,6 +1,6 @@
 {
   "name": "otherone",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "main": "electron/dist/main.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "dev:web": "next dev -p 3002",
     "dev:desktop": "npm run electron:compile && concurrently -n next,electron -c green,blue \"npm run dev\" \"wait-on http-get://localhost:3002 && electron .\"",
     "build": "next build",
-    "build:desktop": "npm run build && npm run electron:compile",
+    "build:server": "npm --prefix server run build",
+    "build:desktop": "npm run build && npm run electron:compile && npm run build:server",
     "start": "next start -p 3002",
     "lint": "next lint",
     "electron:compile": "tsc -p tsconfig.electron.json",

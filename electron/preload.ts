@@ -19,11 +19,14 @@ const allowedInvokeChannels: string[] = [
   'floating-ball:sample-brightness',
   'app-update:get-version',
   'app-update:get-config',
+  'app-config:save-database',
   'logs:get-config',
   'logs:select-directory',
   'logs:reset-directory',
   'logs:open-directory',
 ];
+
+const runtimeConfig = ipcRenderer.sendSync('app-config:get-runtime-sync');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
@@ -32,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     chrome: process.versions.chrome,
     electron: process.versions.electron,
   },
+  runtimeConfig,
   send: (channel: string, data: unknown) => {
     if (allowedSendChannels.includes(channel)) {
       ipcRenderer.send(channel, data);

@@ -22,10 +22,13 @@ import {
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.NEXT_DEV_URL || 'http://localhost:3002';
+const DEV_API_BASE_URL = process.env.OTHERONE_API_BASE_URL || 'http://127.0.0.1:3003/api';
 
 let mainWindow: BrowserWindow | null = null;
 let appServerProcess: ChildProcess | null = null;
+let apiServerProcess: ChildProcess | null = null;
 let appBaseUrl = DEV_SERVER_URL;
+let apiBaseUrl = DEV_API_BASE_URL;
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,12 +57,10 @@ async function findAvailablePort(startPort = 3002): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-function buildEmbeddedServerNodePath(serverCwd: string): string {
+function buildNodePath(...extraEntries: Array<string | undefined>): string {
   const existingNodePath = process.env.NODE_PATH;
   const entries = [
-    path.join(serverCwd, 'node_modules'),
-    path.join(process.resourcesPath, 'app.asar', 'node_modules'),
-    path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules'),
+    ...extraEntries,
     existingNodePath,
   ].filter((entry): entry is string => Boolean(entry));
 
@@ -102,6 +103,109 @@ async function waitForEmbeddedServerReady(
   throw new Error(`Timed out waiting for app server at ${url}`);
 }
 
+function buildDatabaseUrl(): string | undefined {
+  const config = readConfig().databaseConfig;
+  if (!config) {
+    return undefined;
+  }
+
+  const encodedPassword = encodeURIComponent(config.password);
+  return `postgresql://${config.username}:${encodedPassword}@${config.host}:${config.port}/${config.database}`;
+}
+
+function getApiPortHint(): number {
+  try {
+    const parsed = new URL(apiBaseUrl);
+    return Number(parsed.port) || 3003;
+  } catch {
+    return 3003;
+  }
+}
+
+function createServerLogger(scope: string, recentServerOutput: string[]) {
+  return (chunk: Buffer | string, isError = false) => {
+    const message = chunk.toString().trim();
+    if (!message) {
+      return;
+    }
+
+    recentServerOutput.push(message);
+    if (recentServerOutput.length > 10) {
+      recentServerOutput.shift();
+    }
+
+    if (isError) {
+      console.error(`[${scope}] ${message}`);
+      logError(scope, message);
+    } else {
+      console.log(`[${scope}] ${message}`);
+      logInfo(scope, message);
+    }
+  };
+}
+
+async function ensureApiBaseUrl(): Promise<string> {
+  if (isDev) {
+    return DEV_API_BASE_URL;
+  }
+
+  if (apiServerProcess && !apiServerProcess.killed) {
+    return apiBaseUrl;
+  }
+
+  const serverEntry = path.join(process.resourcesPath, 'api-server', 'dist', 'server.js');
+  const serverCwd = path.dirname(serverEntry);
+  const recentServerOutput: string[] = [];
+  const port = await findAvailablePort(getApiPortHint());
+  const databaseUrl = buildDatabaseUrl();
+  const nodePath = buildNodePath(
+    path.join(serverCwd, '..', 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar', 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules'),
+  );
+
+  apiBaseUrl = `http://127.0.0.1:${port}/api`;
+  logInfo('api-server', 'Starting embedded API server', { serverEntry, port, nodePath });
+
+  apiServerProcess = spawn(process.execPath, [serverEntry], {
+    cwd: serverCwd,
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      NODE_ENV: 'production',
+      PORT: String(port),
+      CORS_ORIGIN: appBaseUrl,
+      NODE_PATH: nodePath,
+      ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+    },
+    stdio: 'pipe',
+  });
+
+  const logChunk = createServerLogger('api-server', recentServerOutput);
+  apiServerProcess.stdout?.on('data', (chunk) => logChunk(chunk));
+  apiServerProcess.stderr?.on('data', (chunk) => logChunk(chunk, true));
+
+  apiServerProcess.once('exit', (code, signal) => {
+    console.error('Embedded API server exited', { code, signal });
+    logError('api-server', 'Embedded API server exited', { code, signal });
+    apiServerProcess = null;
+  });
+
+  await waitForEmbeddedServerReady(apiServerProcess, `${apiBaseUrl}/health`, recentServerOutput);
+  logInfo('api-server', 'Embedded API server is ready', { url: apiBaseUrl });
+  return apiBaseUrl;
+}
+
+async function restartApiServer(): Promise<void> {
+  if (apiServerProcess && !apiServerProcess.killed) {
+    apiServerProcess.kill();
+    apiServerProcess = null;
+    await wait(500);
+  }
+
+  await ensureApiBaseUrl();
+}
+
 async function ensureAppBaseUrl(): Promise<string> {
   if (isDev) {
     return DEV_SERVER_URL;
@@ -115,9 +219,14 @@ async function ensureAppBaseUrl(): Promise<string> {
   const serverCwd = path.dirname(serverEntry);
   const recentServerOutput: string[] = [];
   const port = await findAvailablePort();
-  const nodePath = buildEmbeddedServerNodePath(serverCwd);
+  const nodePath = buildNodePath(
+    path.join(serverCwd, 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar', 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules'),
+  );
 
   appBaseUrl = `http://127.0.0.1:${port}`;
+  await ensureApiBaseUrl();
   logInfo('next-server', 'Starting embedded Next.js server', { serverEntry, port, nodePath });
 
   appServerProcess = spawn(process.execPath, [serverEntry], {
@@ -129,34 +238,14 @@ async function ensureAppBaseUrl(): Promise<string> {
       PORT: String(port),
       HOSTNAME: '127.0.0.1',
       NODE_PATH: nodePath,
+      OTHERONE_API_BASE_URL: apiBaseUrl,
     },
     stdio: 'pipe',
   });
 
-  const rememberServerOutput = (message: string) => {
-    recentServerOutput.push(message);
-    if (recentServerOutput.length > 10) {
-      recentServerOutput.shift();
-    }
-  };
-
-  appServerProcess.stdout?.on('data', (chunk) => {
-    const message = chunk.toString().trim();
-    if (message) {
-      rememberServerOutput(message);
-      console.log(`[next] ${message}`);
-      logInfo('next-server', message);
-    }
-  });
-
-  appServerProcess.stderr?.on('data', (chunk) => {
-    const message = chunk.toString().trim();
-    if (message) {
-      rememberServerOutput(message);
-      console.error(`[next] ${message}`);
-      logError('next-server', message);
-    }
-  });
+  const logChunk = createServerLogger('next-server', recentServerOutput);
+  appServerProcess.stdout?.on('data', (chunk) => logChunk(chunk));
+  appServerProcess.stderr?.on('data', (chunk) => logChunk(chunk, true));
 
   appServerProcess.once('exit', (code, signal) => {
     console.error(`Embedded app server exited`, { code, signal });
@@ -271,10 +360,35 @@ function registerFloatingBallIPC(): void {
   });
 }
 
+function registerAppConfigIPC(): void {
+  ipcMain.on('app-config:get-runtime-sync', (event) => {
+    event.returnValue = {
+      apiBaseUrl: isDev ? DEV_API_BASE_URL : apiBaseUrl,
+    };
+  });
+
+  ipcMain.handle('app-config:save-database', async (_event, data: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    database: string;
+  }) => {
+    writeConfig('databaseConfig', data);
+
+    if (!isDev) {
+      await restartApiServer();
+    }
+
+    return { success: true };
+  });
+}
+
 app.whenReady().then(() => {
   const boot = async () => {
     setupProcessLogging();
     registerFloatingBallIPC();
+    registerAppConfigIPC();
     registerLogIPC();
     setupAutoUpdater();
     await createWindow();
@@ -318,5 +432,9 @@ app.on('before-quit', () => {
   if (appServerProcess && !appServerProcess.killed) {
     appServerProcess.kill();
     appServerProcess = null;
+  }
+  if (apiServerProcess && !apiServerProcess.killed) {
+    apiServerProcess.kill();
+    apiServerProcess = null;
   }
 });

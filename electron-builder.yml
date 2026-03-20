@@ -1,5 +1,6 @@
 appId: com.otherone.app
 productName: OtherOne
+icon: resources/icon.png
 directories:
   output: dist-electron
   buildResources: resources
@@ -19,6 +20,20 @@ extraResources:
     to: app/public
     filter:
       - "**/*"
+  - from: server/dist
+    to: api-server/dist
+    filter:
+      - "**/*"
+  - from: server/node_modules
+    to: api-server/node_modules
+    filter:
+      - "**/*"
+  - from: server/prisma
+    to: api-server/prisma
+    filter:
+      - "**/*"
+  - from: server/.env
+    to: api-server/.env
 publish:
   provider: github
   owner: wuyoujae
@@ -26,12 +41,15 @@ publish:
 mac:
   category: public.app-category.developer-tools
   identity: null
+  icon: resources/icon.icns
   target:
     - dmg
     - zip
 win:
+  icon: resources/icon.ico
   target:
     - nsis
 linux:
+  icon: resources/icon.png
   target:
     - AppImage

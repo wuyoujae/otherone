@@ -7,7 +7,10 @@ export function setHttpErrorHandler(handler: (message: string) => void) {
 }
 
 const http = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || '/api',
+  baseURL:
+    typeof window !== 'undefined' && window.electronAPI?.runtimeConfig?.apiBaseUrl
+      ? window.electronAPI.runtimeConfig.apiBaseUrl
+      : process.env.NEXT_PUBLIC_API_URL || '/api',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',

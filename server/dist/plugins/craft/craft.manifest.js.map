@@ -1,0 +1,1 @@
+{"version":3,"file":"craft.manifest.js","sourceRoot":"","sources":["../../../src/plugins/craft/craft.manifest.ts"],"names":[],"mappings":";;;;;AACA,kEAAoC;AACpC,mDAA6E;AAE7E,MAAM,aAAa,GAAmB;IACpC,EAAE,EAAE,OAAO;IACX,WAAW,EAAE,OAAO;IACpB,MAAM,EAAN,sBAAM;IACN,OAAO,EAAE,OAAO;IAChB,KAAK,EAAE;QACL,eAAe,EAAE,mCAAmB;QACpC,eAAe,EAAE,qCAAqB;KACvC;CACF,CAAC;AAEF,kBAAe,aAAa,CAAC"}

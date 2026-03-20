@@ -6,6 +6,7 @@ const router = Router();
 router.post('/test-database', testDatabase);
 router.get('/check-database', checkDatabase);
 router.get('/check-tables', checkTables);
+router.post('/check-tables', checkTables);
 router.post('/init-database', initDatabase);
 
 export default router;

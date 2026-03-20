@@ -1,0 +1,1 @@
+{"version":3,"file":"todo.manifest.js","sourceRoot":"","sources":["../../../src/plugins/todo/todo.manifest.ts"],"names":[],"mappings":";;;;;AACA,gEAAmC;AACnC,iDAAqD;AAErD,MAAM,YAAY,GAAmB;IACnC,EAAE,EAAE,MAAM;IACV,WAAW,EAAE,MAAM;IACnB,MAAM,EAAN,qBAAM;IACN,OAAO,EAAE,OAAO;IAChB,KAAK,EAAE;QACL,eAAe,EAAE,kCAAmB;KACrC;CACF,CAAC;AAEF,kBAAe,YAAY,CAAC"}

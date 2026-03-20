@@ -1,0 +1,117 @@
+export declare function getProjects(userId: string, filter?: string, search?: string): Promise<{
+    members: {
+        id: string;
+        projectId: string;
+        userId: string | null;
+        memberType: number;
+        displayLabel: string;
+        role: number;
+        joinedAt: Date;
+    }[];
+    id: string;
+    status: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    tag: string | null;
+    icon: string;
+    aiStatus: number;
+    aiStatusText: string | null;
+    aiAgentName: string | null;
+    progress: number;
+    systemPrompt: string | null;
+    userId: string | null;
+}[]>;
+export declare function getProjectCounts(userId: string): Promise<{
+    total: number;
+    aiCount: number;
+    reviewCount: number;
+    archivedCount: number;
+}>;
+export declare function getRecentProjects(userId: string, limit?: number): Promise<{
+    id: string;
+    status: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    tag: string | null;
+    icon: string;
+    aiStatus: number;
+    aiStatusText: string | null;
+    aiAgentName: string | null;
+    progress: number;
+    systemPrompt: string | null;
+    userId: string | null;
+}[]>;
+export declare function getProjectById(projectId: string): Promise<{
+    id: string;
+    status: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    tag: string | null;
+    icon: string;
+    aiStatus: number;
+    aiStatusText: string | null;
+    aiAgentName: string | null;
+    progress: number;
+    systemPrompt: string | null;
+    userId: string | null;
+} | null>;
+export declare function createProject(userId: string, displayName: string): Promise<{
+    id: string;
+    status: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    tag: string | null;
+    icon: string;
+    aiStatus: number;
+    aiStatusText: string | null;
+    aiAgentName: string | null;
+    progress: number;
+    systemPrompt: string | null;
+    userId: string | null;
+}>;
+export declare function updateProject(projectId: string, data: {
+    name?: string;
+    description?: string;
+    systemPrompt?: string | null;
+}): Promise<{
+    id: string;
+    status: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    tag: string | null;
+    icon: string;
+    aiStatus: number;
+    aiStatusText: string | null;
+    aiAgentName: string | null;
+    progress: number;
+    systemPrompt: string | null;
+    userId: string | null;
+}>;
+export declare function archiveProject(projectId: string): Promise<{
+    id: string;
+    status: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    tag: string | null;
+    icon: string;
+    aiStatus: number;
+    aiStatusText: string | null;
+    aiAgentName: string | null;
+    progress: number;
+    systemPrompt: string | null;
+    userId: string | null;
+}>;
+export declare function deleteProject(projectId: string): Promise<void>;
+//# sourceMappingURL=project.service.d.ts.map

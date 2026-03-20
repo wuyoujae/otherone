@@ -5,6 +5,9 @@ export interface ElectronAPI {
     chrome: string;
     electron: string;
   };
+  runtimeConfig?: {
+    apiBaseUrl: string | null;
+  };
   send: (channel: string, data: unknown) => void;
   invoke: (channel: string, data?: unknown) => Promise<unknown>;
   on: (channel: string, callback: (...args: unknown[]) => void) => void;

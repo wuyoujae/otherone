@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatedLogo } from '@/components/ui/animated-logo';
+import { getElectronAPI } from '@/lib/electron';
 import http from '@/lib/http';
 
 const TOTAL_STEPS = 5;
@@ -128,7 +129,13 @@ export default function SetupPage() {
   useEffect(() => {
     if (step === 3) {
       setTablesDetectedChecking(true);
-      http.get('/setup/check-tables')
+      http.post('/setup/check-tables', {
+        host: dbConfig.host,
+        port: parseInt(dbConfig.port, 10),
+        username: dbConfig.username,
+        password: dbConfig.password,
+        database: dbConfig.database,
+      })
         .then((res: any) => {
           if (res?.data?.initialized) {
             setTablesDetected(true);
@@ -142,7 +149,7 @@ export default function SetupPage() {
         })
         .finally(() => setTablesDetectedChecking(false));
     }
-  }, [step]);
+  }, [step, dbConfig.host, dbConfig.port, dbConfig.username, dbConfig.password, dbConfig.database]);
 
   // Auto-detect AI providers on step 4
   useEffect(() => {
@@ -198,7 +205,6 @@ export default function SetupPage() {
         port: parseInt(dbConfig.port, 10),
         username: dbConfig.username,
         password: dbConfig.password,
-        database: dbConfig.database,
       });
 
       if (res?.success) {
@@ -207,7 +213,6 @@ export default function SetupPage() {
         setStatus((prev) => ({
           ...prev,
           dbConnected: true,
-          dbConnectionString: res.data.connectionString,
         }));
       } else {
         setDbTestResult('error');
@@ -229,10 +234,25 @@ export default function SetupPage() {
 
     try {
       const res: any = await http.post('/setup/init-database', {
-        connectionString: status.dbConnectionString || undefined,
+        host: dbConfig.host,
+        port: parseInt(dbConfig.port, 10),
+        username: dbConfig.username,
+        password: dbConfig.password,
+        database: dbConfig.database,
       });
 
       if (res?.success) {
+        const api = getElectronAPI();
+        if (api) {
+          await api.invoke('app-config:save-database', {
+            host: dbConfig.host,
+            port: parseInt(dbConfig.port, 10),
+            username: dbConfig.username,
+            password: dbConfig.password,
+            database: dbConfig.database,
+          });
+        }
+
         setDbInitResult('success');
         setDbInitMessage(t('dbInit.success'));
         setStatus((prev) => ({ ...prev, dbInitialized: true }));
@@ -372,6 +392,8 @@ export default function SetupPage() {
             )}
             {step === 3 && (
               <DbInitStep
+                config={dbConfig}
+                setConfig={setDbConfig}
                 consent={dbConsent}
                 setConsent={setDbConsent}
                 initializing={dbInitializing}
@@ -638,16 +660,6 @@ function DatabaseStep({
                 className={inputCls}
               />
             </div>
-            <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-xs font-medium text-foreground-muted">{t('database.dbName')}</label>
-              <input
-                type="text"
-                value={config.database}
-                onChange={(e) => setConfig({ ...config, database: e.target.value })}
-                placeholder={t('database.dbNamePlaceholder')}
-                className={inputCls}
-              />
-            </div>
           </div>
 
           {/* Test result */}
@@ -665,7 +677,7 @@ function DatabaseStep({
           {/* Test button */}
           <button
             onClick={onTest}
-            disabled={testing || !config.host || !config.username || !config.database}
+            disabled={testing || !config.host || !config.username}
             className={cn(
               'mt-5 flex items-center gap-2 h-10 px-6 rounded-lg text-sm font-medium transition-all',
               testing
@@ -693,6 +705,8 @@ function DatabaseStep({
 
 /* ============ Step 3: Database Initialize ============ */
 function DbInitStep({
+  config,
+  setConfig,
   consent,
   setConsent,
   initializing,
@@ -704,6 +718,8 @@ function DbInitStep({
   onSkip,
   t,
 }: {
+  config: DbConfig;
+  setConfig: (c: DbConfig) => void;
   consent: boolean;
   setConsent: (v: boolean) => void;
   initializing: boolean;
@@ -715,6 +731,8 @@ function DbInitStep({
   onSkip: () => void;
   t: ReturnType<typeof useTranslations<'setup'>>;
 }) {
+  const inputCls = 'w-full h-10 px-3 rounded-lg border border-[var(--border-strong)] bg-surface text-sm outline-none transition-all focus:border-foreground focus:ring-1 focus:ring-foreground';
+
   return (
     <div className="pt-4 md:pt-8">
       <div className="flex items-center gap-3 mb-2">
@@ -756,6 +774,17 @@ function DbInitStep({
 
       {!detected && !detectChecking && (
         <div className="bg-surface border border-[var(--border)] rounded-2xl p-6">
+          <div className="flex flex-col gap-1.5 mb-5">
+            <label className="text-xs font-medium text-foreground-muted">{t('database.dbName')}</label>
+            <input
+              type="text"
+              value={config.database}
+              onChange={(e) => setConfig({ ...config, database: e.target.value })}
+              placeholder={t('database.dbNamePlaceholder')}
+              className={inputCls}
+            />
+          </div>
+
           {/* Consent */}
           <label className="flex items-start gap-3 cursor-pointer group">
             <div className="relative mt-0.5">
@@ -794,7 +823,7 @@ function DbInitStep({
           {/* Init button */}
           <button
             onClick={onInit}
-            disabled={!consent || initializing || initResult === 'success'}
+            disabled={!config.database || !consent || initializing || initResult === 'success'}
             className={cn(
               'mt-5 flex items-center gap-2 h-10 px-6 rounded-lg text-sm font-medium transition-all',
               initializing

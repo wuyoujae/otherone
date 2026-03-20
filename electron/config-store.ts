@@ -7,6 +7,13 @@ interface AppConfig {
   floatingBallPosition: { x: number; y: number } | null;
   autoCheckUpdates: boolean;
   logDirectory: string | null;
+  databaseConfig: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    database: string;
+  } | null;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -14,6 +21,7 @@ const DEFAULT_CONFIG: AppConfig = {
   floatingBallPosition: null,
   autoCheckUpdates: true,
   logDirectory: null,
+  databaseConfig: null,
 };
 
 function getConfigPath(): string {
