@@ -60,7 +60,13 @@ function readRawConfig(): RawAppConfig {
   try {
     const raw = fs.readFileSync(getConfigPath(), 'utf-8');
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_RAW_CONFIG, ...parsed };
+    return {
+      ...DEFAULT_RAW_CONFIG,
+      ...parsed,
+      autoCheckUpdates: typeof parsed?.autoCheckUpdates === 'boolean'
+        ? parsed.autoCheckUpdates
+        : true,
+    };
   } catch {
     return { ...DEFAULT_RAW_CONFIG };
   }
