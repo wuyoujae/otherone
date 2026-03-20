@@ -29,7 +29,7 @@ export async function getProjects(userId: string, filter?: string, search?: stri
     orderBy: { updatedAt: 'desc' },
   });
 
-  const projectIds = projects.map((p) => p.id);
+  const projectIds = projects.map((p: { id: string }) => p.id);
   const members = await prisma.projectMember.findMany({
     where: { projectId: { in: projectIds } },
   });
@@ -41,7 +41,7 @@ export async function getProjects(userId: string, filter?: string, search?: stri
     memberMap.set(m.projectId, list);
   }
 
-  return projects.map((p) => ({
+  return projects.map((p: typeof projects[number]) => ({
     ...p,
     members: memberMap.get(p.id) || [],
   }));
