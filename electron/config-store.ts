@@ -6,12 +6,14 @@ interface AppConfig {
   floatingBallEnabled: boolean;
   floatingBallPosition: { x: number; y: number } | null;
   autoCheckUpdates: boolean;
+  logDirectory: string | null;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   floatingBallEnabled: false,
   floatingBallPosition: null,
   autoCheckUpdates: true,
+  logDirectory: null,
 };
 
 function getConfigPath(): string {
@@ -37,3 +39,5 @@ export function writeConfig<K extends keyof AppConfig>(key: K, value: AppConfig[
     // Silently fail if write is not possible
   }
 }
+
+export type { AppConfig };

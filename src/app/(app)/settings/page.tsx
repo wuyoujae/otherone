@@ -30,6 +30,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { isElectron, getElectronAPI } from '@/lib/electron';
+import type { LogDirectoryConfig } from '@/types/electron';
 import type { UpdateStatus, UpdateStatusPayload } from '@/types/update';
 
 type NavKey = 'account' | 'preferences' | 'shortcuts' | 'modelApi' | 'about';
@@ -178,6 +179,10 @@ function PreferencesSection() {
   const currentLocale = useLocale();
   const [floatingBallEnabled, setFloatingBallEnabled] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [logDirectory, setLogDirectory] = useState('');
+  const [isDefaultLogDirectory, setIsDefaultLogDirectory] = useState(true);
+  const [isUpdatingLogDirectory, setIsUpdatingLogDirectory] = useState(false);
+  const [logDirectoryMessage, setLogDirectoryMessage] = useState('');
 
   useEffect(() => {
     const desktop = isElectron();
@@ -185,6 +190,16 @@ function PreferencesSection() {
     if (desktop) {
       const saved = localStorage.getItem('floatingBallEnabled');
       setFloatingBallEnabled(saved === 'true');
+      const api = getElectronAPI();
+      if (api) {
+        api.invoke('logs:get-config').then((config: unknown) => {
+          const logConfig = config as LogDirectoryConfig | null;
+          if (logConfig) {
+            setLogDirectory(logConfig.directory);
+            setIsDefaultLogDirectory(logConfig.isDefault);
+          }
+        });
+      }
     }
   }, []);
 
@@ -219,6 +234,62 @@ function PreferencesSection() {
     document.cookie = `NEXT_LOCALE=${newLang};path=/;max-age=31536000`;
     window.location.reload();
   };
+
+  const handleChooseLogDirectory = useCallback(async () => {
+    const api = getElectronAPI();
+    if (!api) return;
+
+    setIsUpdatingLogDirectory(true);
+    setLogDirectoryMessage('');
+
+    try {
+      const result = await api.invoke('logs:select-directory');
+      const config = result as LogDirectoryConfig | null;
+      if (config) {
+        setLogDirectory(config.directory);
+        setIsDefaultLogDirectory(config.isDefault);
+        setLogDirectoryMessage(t('logDirectoryUpdated'));
+      }
+    } finally {
+      setIsUpdatingLogDirectory(false);
+    }
+  }, [t]);
+
+  const handleResetLogDirectory = useCallback(async () => {
+    const api = getElectronAPI();
+    if (!api) return;
+
+    setIsUpdatingLogDirectory(true);
+    setLogDirectoryMessage('');
+
+    try {
+      const result = await api.invoke('logs:reset-directory');
+      const config = result as LogDirectoryConfig | null;
+      if (config) {
+        setLogDirectory(config.directory);
+        setIsDefaultLogDirectory(config.isDefault);
+        setLogDirectoryMessage(t('logDirectoryReset'));
+      }
+    } finally {
+      setIsUpdatingLogDirectory(false);
+    }
+  }, [t]);
+
+  const handleOpenLogDirectory = useCallback(async () => {
+    const api = getElectronAPI();
+    if (!api) return;
+
+    setLogDirectoryMessage('');
+    const result = await api.invoke('logs:open-directory');
+    const payload = result as { success: boolean; error: string | null } | null;
+
+    if (payload?.success) {
+      setLogDirectoryMessage(t('logDirectoryOpened'));
+      return;
+    }
+
+    setLogDirectoryMessage(payload?.error || t('logDirectoryOpenFailed'));
+  }, [t]);
 
   return (
     <section>
@@ -256,25 +327,83 @@ function PreferencesSection() {
 
       {/* Floating Ball - Desktop only */}
       {isDesktop && (
-        <div className="py-5 border-b border-[var(--border)]">
-          <div className="flex justify-between items-center gap-10">
-            <div>
-              <div className="text-base font-medium mb-1">{t('floatingBall')}</div>
-              <div className="text-sm text-foreground-muted">{t('floatingBallDesc')}</div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-              <input
-                type="checkbox"
-                checked={floatingBallEnabled}
-                onChange={toggleFloatingBall}
-                className="sr-only peer"
-              />
-              <div className="w-10 h-[22px] relative">
-                <span className="switch-slider" />
+        <>
+          <div className="py-5 border-b border-[var(--border)]">
+            <div className="flex justify-between items-center gap-10">
+              <div>
+                <div className="text-base font-medium mb-1">{t('floatingBall')}</div>
+                <div className="text-sm text-foreground-muted">{t('floatingBallDesc')}</div>
               </div>
-            </label>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={floatingBallEnabled}
+                  onChange={toggleFloatingBall}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-[22px] relative">
+                  <span className="switch-slider" />
+                </div>
+              </label>
+            </div>
           </div>
-        </div>
+
+          <div className="py-5 border-b border-[var(--border)]">
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-start gap-10">
+                <div>
+                  <div className="text-base font-medium mb-1">{t('logDirectory')}</div>
+                  <div className="text-sm text-foreground-muted">{t('logDirectoryDesc')}</div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <button
+                    onClick={handleOpenLogDirectory}
+                    className="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-[var(--border-strong)] text-sm text-foreground-muted transition-all hover:border-foreground hover:text-foreground hover:bg-surface-subtle"
+                  >
+                    <ExternalLink size={14} />
+                    {t('openLogDirectory')}
+                  </button>
+                  <button
+                    onClick={handleChooseLogDirectory}
+                    disabled={isUpdatingLogDirectory}
+                    className={cn(
+                      'flex items-center gap-1.5 h-9 px-4 rounded-lg border text-sm transition-all',
+                      isUpdatingLogDirectory
+                        ? 'border-[var(--border)] text-foreground-lighter cursor-not-allowed'
+                        : 'border-[var(--border-strong)] text-foreground-muted hover:border-foreground hover:text-foreground hover:bg-surface-subtle'
+                    )}
+                  >
+                    {isUpdatingLogDirectory ? <Loader2 size={14} className="animate-spin" /> : <ScrollText size={14} />}
+                    {t('changeLogDirectory')}
+                  </button>
+                  <button
+                    onClick={handleResetLogDirectory}
+                    disabled={isUpdatingLogDirectory || isDefaultLogDirectory}
+                    className={cn(
+                      'flex items-center gap-1.5 h-9 px-4 rounded-lg border text-sm transition-all',
+                      isUpdatingLogDirectory || isDefaultLogDirectory
+                        ? 'border-[var(--border)] text-foreground-lighter cursor-not-allowed'
+                        : 'border-[var(--border-strong)] text-foreground-muted hover:border-foreground hover:text-foreground hover:bg-surface-subtle'
+                    )}
+                  >
+                    <RotateCcw size={14} />
+                    {t('resetLogDirectory')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-surface-subtle p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-foreground-lighter mb-2">
+                  {isDefaultLogDirectory ? t('logDirectoryDefaultBadge') : t('logDirectoryCustomBadge')}
+                </div>
+                <div className="font-mono text-sm break-all text-foreground">{logDirectory || '...'}</div>
+                {logDirectoryMessage && (
+                  <div className="mt-3 text-sm text-foreground-muted">{logDirectoryMessage}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </section>
   );

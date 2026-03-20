@@ -6,6 +6,19 @@ directories:
 files:
   - electron/dist/**/*
   - "!electron/dist/**/*.map"
+extraResources:
+  - from: .next/standalone
+    to: app
+    filter:
+      - "**/*"
+  - from: .next/static
+    to: app/.next/static
+    filter:
+      - "**/*"
+  - from: public
+    to: app/public
+    filter:
+      - "**/*"
 publish:
   provider: github
   owner: wuyoujae

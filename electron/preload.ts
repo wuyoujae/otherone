@@ -19,6 +19,10 @@ const allowedInvokeChannels: string[] = [
   'floating-ball:sample-brightness',
   'app-update:get-version',
   'app-update:get-config',
+  'logs:get-config',
+  'logs:select-directory',
+  'logs:reset-directory',
+  'logs:open-directory',
 ];
 
 contextBridge.exposeInMainWorld('electronAPI', {

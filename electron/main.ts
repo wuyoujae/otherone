@@ -1,5 +1,7 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import * as path from 'path';
+import * as net from 'net';
+import { spawn, type ChildProcess } from 'child_process';
 import { readConfig, writeConfig } from './config-store';
 import {
   createFloatingBallWindow,
@@ -10,13 +12,125 @@ import {
   resizeFloatingBallWindow,
 } from './floating-ball';
 import { setupAutoUpdater, checkForUpdatesOnLaunch } from './auto-updater';
+import {
+  attachWindowLogging,
+  logError,
+  logInfo,
+  registerLogIPC,
+  setupProcessLogging,
+} from './logger';
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = process.env.NEXT_DEV_URL || 'http://localhost:3002';
 
 let mainWindow: BrowserWindow | null = null;
+let appServerProcess: ChildProcess | null = null;
+let appBaseUrl = DEV_SERVER_URL;
 
-function createWindow(): void {
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function findAvailablePort(startPort = 3002): Promise<number> {
+  const maxAttempts = 20;
+
+  for (let port = startPort; port < startPort + maxAttempts; port++) {
+    const isAvailable = await new Promise<boolean>((resolve) => {
+      const server = net.createServer();
+
+      server.once('error', () => resolve(false));
+      server.once('listening', () => {
+        server.close(() => resolve(true));
+      });
+
+      server.listen(port, '127.0.0.1');
+    });
+
+    if (isAvailable) {
+      return port;
+    }
+  }
+
+  throw new Error(`No available port found starting from ${startPort}`);
+}
+
+async function waitForServer(url: string, timeoutMs = 20000): Promise<void> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // Server is still starting.
+    }
+
+    await wait(250);
+  }
+
+  throw new Error(`Timed out waiting for app server at ${url}`);
+}
+
+async function ensureAppBaseUrl(): Promise<string> {
+  if (isDev) {
+    return DEV_SERVER_URL;
+  }
+
+  if (appServerProcess && !appServerProcess.killed) {
+    return appBaseUrl;
+  }
+
+  const serverEntry = path.join(process.resourcesPath, 'app', 'server.js');
+  const serverCwd = path.dirname(serverEntry);
+  const port = await findAvailablePort();
+
+  appBaseUrl = `http://127.0.0.1:${port}`;
+  logInfo('next-server', 'Starting embedded Next.js server', { serverEntry, port });
+
+  appServerProcess = spawn(process.execPath, [serverEntry], {
+    cwd: serverCwd,
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      NODE_ENV: 'production',
+      PORT: String(port),
+      HOSTNAME: '127.0.0.1',
+    },
+    stdio: 'pipe',
+  });
+
+  appServerProcess.stdout?.on('data', (chunk) => {
+    const message = chunk.toString().trim();
+    if (message) {
+      console.log(`[next] ${message}`);
+      logInfo('next-server', message);
+    }
+  });
+
+  appServerProcess.stderr?.on('data', (chunk) => {
+    const message = chunk.toString().trim();
+    if (message) {
+      console.error(`[next] ${message}`);
+      logError('next-server', message);
+    }
+  });
+
+  appServerProcess.once('exit', (code, signal) => {
+    console.error(`Embedded app server exited`, { code, signal });
+    logError('next-server', 'Embedded app server exited', { code, signal });
+    appServerProcess = null;
+  });
+
+  await waitForServer(appBaseUrl);
+  logInfo('next-server', 'Embedded Next.js server is ready', { url: appBaseUrl });
+  return appBaseUrl;
+}
+
+async function createWindow(): Promise<void> {
+  const baseUrl = await ensureAppBaseUrl();
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -36,11 +150,12 @@ function createWindow(): void {
     mainWindow?.show();
   });
 
+  attachWindowLogging(mainWindow, 'main');
+
   if (isDev) {
-    mainWindow.loadURL(DEV_SERVER_URL);
+    mainWindow.loadURL(baseUrl);
   } else {
-    // Production: load from built Next.js standalone server
-    mainWindow.loadURL(DEV_SERVER_URL);
+    mainWindow.loadURL(baseUrl);
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -87,7 +202,7 @@ function registerFloatingBallIPC(): void {
     writeConfig('floatingBallEnabled', enabled);
 
     if (enabled) {
-      createFloatingBallWindow(DEV_SERVER_URL);
+      createFloatingBallWindow(appBaseUrl);
       // Hide immediately if main window is focused
       if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) {
         hideFloatingBallWindow();
@@ -116,17 +231,29 @@ function registerFloatingBallIPC(): void {
 }
 
 app.whenReady().then(() => {
-  registerFloatingBallIPC();
-  setupAutoUpdater();
-  createWindow();
-  checkForUpdatesOnLaunch();
+  const boot = async () => {
+    setupProcessLogging();
+    registerFloatingBallIPC();
+    registerLogIPC();
+    setupAutoUpdater();
+    await createWindow();
+    checkForUpdatesOnLaunch();
 
-  // Restore floating ball if previously enabled (hidden initially since main window is focused)
-  const config = readConfig();
-  if (config.floatingBallEnabled) {
-    createFloatingBallWindow(DEV_SERVER_URL);
-    hideFloatingBallWindow();
-  }
+    // Restore floating ball if previously enabled (hidden initially since main window is focused)
+    const config = readConfig();
+    if (config.floatingBallEnabled) {
+      createFloatingBallWindow(appBaseUrl);
+      hideFloatingBallWindow();
+    }
+  };
+
+  boot().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Failed to boot desktop app', error);
+    logError('app', 'Failed to boot desktop app', error);
+    dialog.showErrorBox('Failed to start OtherOne', message);
+    app.quit();
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -137,6 +264,18 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    createWindow().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to recreate main window', error);
+      logError('app', 'Failed to recreate main window', error);
+      dialog.showErrorBox('Failed to reopen OtherOne', message);
+    });
+  }
+});
+
+app.on('before-quit', () => {
+  if (appServerProcess && !appServerProcess.killed) {
+    appServerProcess.kill();
+    appServerProcess = null;
   }
 });

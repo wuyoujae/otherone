@@ -11,6 +11,11 @@ export interface ElectronAPI {
   removeAllListeners: (channel: string) => void;
 }
 
+export interface LogDirectoryConfig {
+  directory: string;
+  isDefault: boolean;
+}
+
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;

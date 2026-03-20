@@ -1,6 +1,7 @@
 import { BrowserWindow, desktopCapturer, nativeTheme, screen } from 'electron';
 import * as path from 'path';
 import { readConfig, writeConfig } from './config-store';
+import { attachWindowLogging, logError } from './logger';
 
 const COLLAPSED_SIZE = 64;
 const EXPANDED_WIDTH = 380;
@@ -104,7 +105,8 @@ async function sampleBrightness(): Promise<number> {
     }
 
     return count > 0 ? Math.round(total / count) : -1;
-  } catch {
+  } catch (error) {
+    logError('floating-ball', 'Brightness sampling failed', error);
     captureFailures++;
     return -1;
   }
@@ -185,6 +187,7 @@ export function createFloatingBallWindow(devServerUrl: string): void {
     floatingBallWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
 
+  attachWindowLogging(floatingBallWindow, 'floating-ball');
   floatingBallWindow.loadURL(`${devServerUrl}/floating-ball`);
 
   floatingBallWindow.once('ready-to-show', () => {
