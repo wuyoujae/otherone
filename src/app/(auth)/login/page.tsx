@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Github } from 'lucide-react';
+import { Github, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useMessage } from '@/components/ui/message/message-provider';
 import { persistDesktopAuthSession, writeBrowserAuthSession } from '@/lib/auth-session';
 import http from '@/lib/http';
+import { getElectronAPI, isElectron } from '@/lib/electron';
 
 type AuthMode = 'login' | 'register';
 
@@ -23,6 +24,42 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [securityPassword, setSecurityPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const api = getElectronAPI();
+
+    if (!api) {
+      return;
+    }
+
+    void api.invoke('app-config:get-bootstrap')
+      .then((bootstrap) => {
+        if (cancelled) {
+          return;
+        }
+        const status = bootstrap as { needsSetup?: boolean; hasAuthSession?: boolean } | null;
+        if (status?.needsSetup) {
+          router.replace('/setup');
+          return;
+        }
+        if (status?.hasAuthSession) {
+          router.replace('/dashboard');
+        }
+      })
+      .catch(() => {
+        // Ignore bootstrap lookup errors on login page.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const isLogin = mode === 'login';
 
@@ -66,8 +103,40 @@ export default function LoginPage() {
     }
   };
 
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (resettingPassword) return;
+
+    if (!isElectron()) {
+      message.error(t('forgotDesktopOnly'));
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const api = getElectronAPI();
+      await api?.invoke('app-auth:reset-password', {
+        email: resetEmail.trim().toLowerCase(),
+        newPassword,
+        securityPassword,
+      });
+
+      setEmail(resetEmail.trim().toLowerCase());
+      setPassword('');
+      setSecurityPassword('');
+      setNewPassword('');
+      setForgotOpen(false);
+      message.success(t('forgotSuccess'));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : t('forgotFailed');
+      message.error(msg);
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="desktop-shell-height flex overflow-hidden">
       {/* Left brand area (dark) */}
       <div className="hidden lg:flex flex-1 bg-[#09090b] text-zinc-50 relative flex-col justify-between p-10 overflow-hidden">
         <div className="auth-grid-bg absolute inset-0 z-[1]" />
@@ -75,7 +144,7 @@ export default function LoginPage() {
 
         <div className="relative z-[2]">
           <div className="flex items-center gap-3 font-bold text-xl tracking-tight">
-            <Image src="/otherone-icon.svg" alt="OtherOne" width={32} height={32} className="invert" />
+            <Image src="/otherone-icon.svg" alt="OtherOne" width={32} height={32} />
             <span>{tc('appName')}</span>
           </div>
         </div>
@@ -180,12 +249,16 @@ export default function LoginPage() {
               <label className="text-sm font-medium flex justify-between">
                 {t('password')}
                 {isLogin && (
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setForgotOpen(true);
+                    }}
                     className="text-foreground-muted font-normal hover:text-foreground hover:underline transition-colors"
                   >
                     {t('forgotPassword')}
-                  </a>
+                  </button>
                 )}
               </label>
               <input
@@ -228,6 +301,86 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {forgotOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-surface p-6 shadow-xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight">{t('forgotTitle')}</h2>
+                <p className="mt-1 text-sm text-foreground-muted">{t('forgotDesc')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForgotOpen(false)}
+                className="rounded-lg p-2 text-foreground-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">{t('email')}</label>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder={t('emailPlaceholder')}
+                  className="h-11 rounded-lg border border-[var(--border-strong)] bg-surface px-3.5 text-[0.95rem] text-foreground outline-none transition-all focus:border-foreground focus:ring-1 focus:ring-foreground"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">{t('securityPassword')}</label>
+                <input
+                  type="password"
+                  value={securityPassword}
+                  onChange={(e) => setSecurityPassword(e.target.value)}
+                  placeholder={t('securityPasswordPlaceholder')}
+                  className="h-11 rounded-lg border border-[var(--border-strong)] bg-surface px-3.5 text-[0.95rem] text-foreground outline-none transition-all focus:border-foreground focus:ring-1 focus:ring-foreground"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">{t('forgotNewPassword')}</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="h-11 rounded-lg border border-[var(--border-strong)] bg-surface px-3.5 text-[0.95rem] text-foreground outline-none transition-all focus:border-foreground focus:ring-1 focus:ring-foreground"
+                  minLength={8}
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setForgotOpen(false)}
+                  className="h-10 rounded-lg px-4 text-sm text-foreground-muted transition-colors hover:text-foreground"
+                >
+                  {t('forgotCancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword}
+                  className={cn(
+                    'flex h-10 items-center gap-2 rounded-lg bg-foreground px-5 text-sm font-medium text-white transition-all hover:bg-zinc-800',
+                    resettingPassword && 'cursor-wait opacity-70'
+                  )}
+                >
+                  {resettingPassword && <Loader2 size={15} className="animate-spin" />}
+                  {t('forgotSubmit')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

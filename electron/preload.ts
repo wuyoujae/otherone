@@ -8,25 +8,34 @@ const allowedSendChannels: string[] = [
   'app-update:download',
   'app-update:restart',
   'app-update:toggle-auto',
+  'window:minimize',
+  'window:toggle-maximize',
+  'window:close',
 ];
 const allowedReceiveChannels: string[] = [
   'floating-ball:toggled',
   'floating-ball:brightness',
   'floating-ball:layout',
   'app-update:status',
+  'window:state',
 ];
 const allowedInvokeChannels: string[] = [
   'floating-ball:sample-brightness',
   'app-update:get-version',
   'app-update:get-config',
+  'app-config:get-bootstrap',
   'app-config:save-database',
+  'app-config:save-security-password',
+  'app-config:verify-security-password',
   'app-auth:get-session',
   'app-auth:set-session',
   'app-auth:clear-session',
+  'app-auth:reset-password',
   'logs:get-config',
   'logs:select-directory',
   'logs:reset-directory',
   'logs:open-directory',
+  'window:get-state',
 ];
 
 const runtimeConfig = ipcRenderer.sendSync('app-config:get-runtime-sync');

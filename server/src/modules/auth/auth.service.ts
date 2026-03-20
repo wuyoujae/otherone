@@ -18,6 +18,11 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ResetPasswordInput {
+  email: string;
+  password: string;
+}
+
 function generateToken(payload: JwtPayload): string {
   // 30 days in seconds
   return jwt.sign(payload, env.jwtSecret, { expiresIn: 30 * 24 * 60 * 60 });
@@ -81,4 +86,23 @@ export async function getProfile(userId: string) {
     throw { status: 404, message: 'User not found' };
   }
   return sanitizeUser(user);
+}
+
+export async function resetPasswordLocal(input: ResetPasswordInput) {
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  if (!user) {
+    throw { status: 404, message: 'User not found' };
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash,
+      updatedAt: new Date(),
+    },
+  });
+
+  return { success: true };
 }

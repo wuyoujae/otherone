@@ -26,9 +26,10 @@ import {
 import { cn } from '@/lib/utils';
 import { AnimatedLogo } from '@/components/ui/animated-logo';
 import { getElectronAPI } from '@/lib/electron';
+import type { BootstrapStatus } from '@/types/electron';
 import http from '@/lib/http';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 interface DbConfig {
   host: string;
@@ -49,8 +50,8 @@ interface AiProvider {
 
 interface StepStatus {
   dbConnected: boolean;
-  dbConnectionString: string;
   dbInitialized: boolean;
+  securityPasswordConfigured: boolean;
   aiConfigured: boolean;
   aiProviders: AiProvider[];
   language: string;
@@ -66,12 +67,15 @@ export default function SetupPage() {
   // Step status
   const [status, setStatus] = useState<StepStatus>({
     dbConnected: false,
-    dbConnectionString: '',
     dbInitialized: false,
+    securityPasswordConfigured: false,
     aiConfigured: false,
     aiProviders: [],
     language: currentLocale,
   });
+  const [bootstrap, setBootstrap] = useState<BootstrapStatus | null>(null);
+  const [bootstrapLoading, setBootstrapLoading] = useState(true);
+  const [bootstrapError, setBootstrapError] = useState('');
 
   // Database form
   const [dbConfig, setDbConfig] = useState<DbConfig>({
@@ -102,32 +106,82 @@ export default function SetupPage() {
   const [aiDetected, setAiDetected] = useState(false);
   const [showDbForm, setShowDbForm] = useState(false);
   const [showAiForm, setShowAiForm] = useState(false);
+  const [securityPassword, setSecurityPassword] = useState('');
+  const [securityPasswordConfirm, setSecurityPasswordConfirm] = useState('');
+  const [securitySaving, setSecuritySaving] = useState(false);
+  const [securityResult, setSecurityResult] = useState<'success' | 'error' | null>(null);
+  const [securityMessage, setSecurityMessage] = useState('');
+
+  const refreshBootstrap = useCallback(async () => {
+    const api = getElectronAPI();
+    if (!api) {
+      setBootstrapLoading(false);
+      return null;
+    }
+
+    setBootstrapLoading(true);
+    try {
+      const result = await api.invoke('app-config:get-bootstrap') as BootstrapStatus;
+      setBootstrap(result);
+      setBootstrapError('');
+      setStatus((prev) => ({
+        ...prev,
+        dbConnected: result.databaseConnected,
+        dbInitialized: result.databaseSchemaReady,
+        securityPasswordConfigured: result.securityPasswordConfigured,
+      }));
+
+      if (result.databaseConfig) {
+        setDbConfig({
+          host: result.databaseConfig.host || 'localhost',
+          port: String(result.databaseConfig.port || 5432),
+          username: result.databaseConfig.username || 'postgres',
+          password: result.databaseConfig.password || '',
+          database: result.databaseConfig.database || 'otherone',
+        });
+      }
+
+      return result;
+    } catch (error) {
+      setBootstrapError(error instanceof Error ? error.message : t('bootstrap.failed'));
+      return null;
+    } finally {
+      setBootstrapLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void refreshBootstrap();
+  }, [refreshBootstrap]);
+
+  useEffect(() => {
+    if (!bootstrapLoading && bootstrap && !bootstrap.needsSetup) {
+      window.location.replace(bootstrap.hasAuthSession ? '/dashboard' : '/login');
+    }
+  }, [bootstrap, bootstrapLoading]);
 
   // Auto-detect database connection on step 2
   useEffect(() => {
     if (step === 2) {
       setDbDetectedChecking(true);
-      http.get('/setup/check-database')
-        .then((res: any) => {
-          if (res?.data?.connected) {
-            setDbDetected(true);
-            setShowDbForm(false);
-          } else {
-            setDbDetected(false);
-            setShowDbForm(true);
-          }
-        })
-        .catch(() => {
-          setDbDetected(false);
-          setShowDbForm(true);
-        })
-        .finally(() => setDbDetectedChecking(false));
+      const hasStoredConfig = Boolean(bootstrap?.databaseConfig);
+      const passwordStored = Boolean(bootstrap?.databasePasswordStored && bootstrap?.databaseConfig?.password);
+      setDbDetected(hasStoredConfig && passwordStored && Boolean(bootstrap?.databaseConnected));
+      setShowDbForm(!hasStoredConfig || !passwordStored || !bootstrap?.databaseConnected);
+      setDbDetectedChecking(false);
     }
-  }, [step]);
+  }, [step, bootstrap]);
 
   // Auto-detect tables on step 3
   useEffect(() => {
     if (step === 3) {
+      if (bootstrap?.databaseSchemaReady) {
+        setTablesDetected(true);
+        setStatus((prev) => ({ ...prev, dbInitialized: true }));
+        setTablesDetectedChecking(false);
+        return;
+      }
+
       setTablesDetectedChecking(true);
       http.post('/setup/check-tables', {
         host: dbConfig.host,
@@ -149,11 +203,11 @@ export default function SetupPage() {
         })
         .finally(() => setTablesDetectedChecking(false));
     }
-  }, [step, dbConfig.host, dbConfig.port, dbConfig.username, dbConfig.password, dbConfig.database]);
+  }, [step, bootstrap?.databaseSchemaReady, dbConfig.host, dbConfig.port, dbConfig.username, dbConfig.password, dbConfig.database]);
 
   // Auto-detect AI providers on step 4
   useEffect(() => {
-    if (step === 4) {
+    if (step === 5) {
       try {
         const saved = localStorage.getItem('otherone_ai_providers');
         if (saved) {
@@ -208,6 +262,19 @@ export default function SetupPage() {
       });
 
       if (res?.success) {
+        const api = getElectronAPI();
+        if (api) {
+          await api.invoke('app-config:save-database', {
+            host: dbConfig.host,
+            port: parseInt(dbConfig.port, 10),
+            username: dbConfig.username,
+            password: dbConfig.password,
+            database: dbConfig.database,
+          });
+          const nextBootstrap = await refreshBootstrap();
+          setDbDetected(Boolean(nextBootstrap?.databaseConnected));
+        }
+
         setDbTestResult('success');
         setDbTestMessage(res.message || t('database.connected'));
         setStatus((prev) => ({
@@ -251,6 +318,7 @@ export default function SetupPage() {
             password: dbConfig.password,
             database: dbConfig.database,
           });
+          await refreshBootstrap();
         }
 
         setDbInitResult('success');
@@ -269,6 +337,50 @@ export default function SetupPage() {
     }
   };
 
+  const handleSaveSecurityPassword = async () => {
+    if (securitySaving) {
+      return;
+    }
+
+    if (!securityPassword || securityPassword.length < 6) {
+      setSecurityResult('error');
+      setSecurityMessage(t('securityPassword.minLength'));
+      return;
+    }
+
+    if (securityPassword !== securityPasswordConfirm) {
+      setSecurityResult('error');
+      setSecurityMessage(t('securityPassword.mismatch'));
+      return;
+    }
+
+    const api = getElectronAPI();
+    if (!api) {
+      setSecurityResult('error');
+      setSecurityMessage(t('securityPassword.desktopOnly'));
+      return;
+    }
+
+    setSecuritySaving(true);
+    setSecurityResult(null);
+    setSecurityMessage('');
+
+    try {
+      await api.invoke('app-config:save-security-password', {
+        password: securityPassword,
+      });
+      await refreshBootstrap();
+      setStatus((prev) => ({ ...prev, securityPasswordConfigured: true }));
+      setSecurityResult('success');
+      setSecurityMessage(t('securityPassword.saved'));
+    } catch (error) {
+      setSecurityResult('error');
+      setSecurityMessage(error instanceof Error ? error.message : t('securityPassword.failed'));
+    } finally {
+      setSecuritySaving(false);
+    }
+  };
+
   const handleComplete = () => {
     // Save AI providers to localStorage
     if (aiProviders.length > 0) {
@@ -280,6 +392,7 @@ export default function SetupPage() {
       language: status.language,
       dbConnected: status.dbConnected,
       dbInitialized: status.dbInitialized,
+      securityPasswordConfigured: status.securityPasswordConfigured,
       aiConfigured: aiProviders.length > 0,
       completedAt: new Date().toISOString(),
     }));
@@ -290,10 +403,11 @@ export default function SetupPage() {
   const canProceed = (): boolean => {
     switch (step) {
       case 1: return true;
-      case 2: return status.dbConnected || dbDetected;
-      case 3: return status.dbInitialized || tablesDetected;
-      case 4: return true; // AI is optional
+      case 2: return status.dbConnected || dbDetected || Boolean(bootstrap?.databaseConnected);
+      case 3: return status.dbInitialized || tablesDetected || Boolean(bootstrap?.databaseSchemaReady);
+      case 4: return status.securityPasswordConfigured || Boolean(bootstrap?.securityPasswordConfigured);
       case 5: return true;
+      case 6: return true;
       default: return false;
     }
   };
@@ -304,14 +418,26 @@ export default function SetupPage() {
     { icon: Globe, label: 'Welcome' },
     { icon: Database, label: 'Database' },
     { icon: Layers, label: 'Initialize' },
+    { icon: EyeOff, label: 'Security' },
     { icon: Cpu, label: 'AI' },
     { icon: Rocket, label: 'Complete' },
   ];
 
+  if (bootstrapLoading && !bootstrap) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="flex items-center gap-3 text-sm text-foreground-muted">
+          <Loader2 size={18} className="animate-spin" />
+          <span>{t('bootstrap.loading')}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col setup-grid-bg">
+    <div className="desktop-shell-min-height flex flex-col setup-grid-bg">
       {/* Top progress bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-[var(--border)] z-50">
+      <div className="fixed left-0 right-0 top-[var(--desktop-titlebar-height,0px)] h-1 bg-[var(--border)] z-50">
         <div
           className="h-full bg-foreground setup-progress-bar"
           style={{
@@ -355,6 +481,14 @@ export default function SetupPage() {
         {t('nav.step', { current: step.toString(), total: TOTAL_STEPS.toString() })}
       </div>
 
+      {bootstrapError && (
+        <div className="mx-auto mb-4 w-full max-w-2xl px-4">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {bootstrapError}
+          </div>
+        </div>
+      )}
+
       {/* Main content area */}
       <div className="flex-1 flex items-start justify-center px-4 pb-24">
         <div className="w-full max-w-2xl">
@@ -381,6 +515,7 @@ export default function SetupPage() {
                 onTest={handleTestDb}
                 detected={dbDetected}
                 detectChecking={dbDetectedChecking}
+                bootstrap={bootstrap}
                 showForm={showDbForm}
                 setShowForm={setShowDbForm}
                 onSkip={() => {
@@ -406,10 +541,25 @@ export default function SetupPage() {
                   setStatus((prev) => ({ ...prev, dbInitialized: true }));
                   goNext();
                 }}
+                bootstrap={bootstrap}
                 t={t}
               />
             )}
             {step === 4 && (
+              <SecurityPasswordStep
+                configured={Boolean(bootstrap?.securityPasswordConfigured)}
+                password={securityPassword}
+                confirmPassword={securityPasswordConfirm}
+                setPassword={setSecurityPassword}
+                setConfirmPassword={setSecurityPasswordConfirm}
+                saving={securitySaving}
+                result={securityResult}
+                message={securityMessage}
+                onSave={handleSaveSecurityPassword}
+                t={t}
+              />
+            )}
+            {step === 5 && (
               <AiProviderStep
                 providers={aiProviders}
                 setProviders={setAiProviders}
@@ -420,7 +570,7 @@ export default function SetupPage() {
                 t={t}
               />
             )}
-            {step === 5 && (
+            {step === 6 && (
               <CompleteStep
                 status={status}
                 aiProviders={aiProviders}
@@ -433,7 +583,7 @@ export default function SetupPage() {
       </div>
 
       {/* Bottom navigation */}
-      {step > 1 && step < 5 && (
+      {step > 1 && step < TOTAL_STEPS && (
         <div className="fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-md border-t border-[var(--border)] z-40">
           <div className="max-w-2xl mx-auto flex items-center justify-between px-6 py-4">
             <button
@@ -547,6 +697,7 @@ function DatabaseStep({
   onTest,
   detected,
   detectChecking,
+  bootstrap,
   showForm,
   setShowForm,
   onSkip,
@@ -560,6 +711,7 @@ function DatabaseStep({
   onTest: () => void;
   detected: boolean;
   detectChecking: boolean;
+  bootstrap: BootstrapStatus | null;
   showForm: boolean;
   setShowForm: (v: boolean) => void;
   onSkip: () => void;
@@ -584,7 +736,7 @@ function DatabaseStep({
       {detectChecking && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-surface border border-[var(--border)] mb-6">
           <Loader2 size={18} className="animate-spin text-foreground-muted" />
-          <span className="text-sm text-foreground-muted">Checking existing configuration...</span>
+          <span className="text-sm text-foreground-muted">{t('database.checking')}</span>
         </div>
       )}
 
@@ -613,6 +765,20 @@ function DatabaseStep({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {bootstrap?.databaseConfigured && !bootstrap.databasePasswordStored && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div className="font-medium">{t('database.passwordMissing')}</div>
+          <p className="mt-1 text-xs text-amber-700">{t('database.passwordMissingDesc')}</p>
+        </div>
+      )}
+
+      {bootstrap?.lastDatabaseError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="font-medium">{t('database.connectionIssue')}</div>
+          <p className="mt-1 break-all text-xs text-red-600">{bootstrap.lastDatabaseError}</p>
         </div>
       )}
 
@@ -716,6 +882,7 @@ function DbInitStep({
   detected,
   detectChecking,
   onSkip,
+  bootstrap,
   t,
 }: {
   config: DbConfig;
@@ -729,6 +896,7 @@ function DbInitStep({
   detected: boolean;
   detectChecking: boolean;
   onSkip: () => void;
+  bootstrap: BootstrapStatus | null;
   t: ReturnType<typeof useTranslations<'setup'>>;
 }) {
   const inputCls = 'w-full h-10 px-3 rounded-lg border border-[var(--border-strong)] bg-surface text-sm outline-none transition-all focus:border-foreground focus:ring-1 focus:ring-foreground';
@@ -749,7 +917,14 @@ function DbInitStep({
       {detectChecking && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-surface border border-[var(--border)] mb-6">
           <Loader2 size={18} className="animate-spin text-foreground-muted" />
-          <span className="text-sm text-foreground-muted">Checking database tables...</span>
+          <span className="text-sm text-foreground-muted">{t('dbInit.checking')}</span>
+        </div>
+      )}
+
+      {bootstrap?.databaseConfigured && bootstrap.databaseConnected && !bootstrap.databaseSchemaReady && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div className="font-medium">{t('dbInit.autoUpgradePending')}</div>
+          <p className="mt-1 text-xs text-amber-700">{t('dbInit.autoUpgradePendingDesc')}</p>
         </div>
       )}
 
@@ -852,6 +1027,114 @@ function DbInitStep({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============ Step 4: Security Password ============ */
+function SecurityPasswordStep({
+  configured,
+  password,
+  confirmPassword,
+  setPassword,
+  setConfirmPassword,
+  saving,
+  result,
+  message,
+  onSave,
+  t,
+}: {
+  configured: boolean;
+  password: string;
+  confirmPassword: string;
+  setPassword: (value: string) => void;
+  setConfirmPassword: (value: string) => void;
+  saving: boolean;
+  result: 'success' | 'error' | null;
+  message: string;
+  onSave: () => void;
+  t: ReturnType<typeof useTranslations<'setup'>>;
+}) {
+  const inputCls = 'w-full h-10 px-3 rounded-lg border border-[var(--border-strong)] bg-surface text-sm outline-none transition-all focus:border-foreground focus:ring-1 focus:ring-foreground';
+
+  return (
+    <div className="pt-4 md:pt-8">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center">
+          <EyeOff size={20} className="text-foreground" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">{t('securityPassword.title')}</h2>
+          <p className="text-sm text-foreground-muted">{t('securityPassword.subtitle')}</p>
+        </div>
+      </div>
+      <p className="mb-6 ml-[52px] text-sm text-foreground-lighter">{t('securityPassword.desc')}</p>
+
+      {configured && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <div className="flex items-start gap-3">
+            <CircleCheck size={20} className="mt-0.5 flex-shrink-0 text-emerald-600" />
+            <div>
+              <div className="text-sm font-medium text-emerald-800">{t('securityPassword.detected')}</div>
+              <p className="mt-1 text-xs text-emerald-600">{t('securityPassword.detectedDesc')}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-[var(--border)] bg-surface p-6">
+        <div className="grid grid-cols-1 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-foreground-muted">{t('securityPassword.label')}</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t('securityPassword.placeholder')}
+              className={inputCls}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-foreground-muted">{t('securityPassword.confirmLabel')}</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder={t('securityPassword.confirmPlaceholder')}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs leading-relaxed text-foreground-muted">
+          {t('securityPassword.hint')}
+        </p>
+
+        {result && (
+          <div className={cn(
+            'mt-4 flex items-center gap-2 rounded-lg border p-3 text-sm',
+            result === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            result === 'error' && 'border-red-200 bg-red-50 text-red-700'
+          )}>
+            {result === 'success' ? <CircleCheck size={16} /> : <CircleX size={16} />}
+            <span>{message}</span>
+          </div>
+        )}
+
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className={cn(
+            'mt-5 flex h-10 items-center gap-2 rounded-lg px-6 text-sm font-medium transition-all',
+            saving
+              ? 'cursor-wait bg-foreground/60 text-white'
+              : 'bg-foreground text-white hover:bg-foreground/90'
+          )}
+        >
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <EyeOff size={16} />}
+          {configured ? t('securityPassword.updateButton') : t('securityPassword.saveButton')}
+        </button>
+      </div>
     </div>
   );
 }

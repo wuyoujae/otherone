@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import * as net from 'net';
+import * as crypto from 'crypto';
 import { spawn, type ChildProcess } from 'child_process';
-import { readConfig, writeConfig } from './config-store';
+import { readConfig, setSecurityPassword, verifySecurityPassword, writeConfig } from './config-store';
 import {
   createFloatingBallWindow,
   destroyFloatingBallWindow,
@@ -29,6 +30,34 @@ let appServerProcess: ChildProcess | null = null;
 let apiServerProcess: ChildProcess | null = null;
 let appBaseUrl = DEV_SERVER_URL;
 let apiBaseUrl = DEV_API_BASE_URL;
+const INTERNAL_PASSWORD_RESET_TOKEN = crypto.randomUUID();
+let bootstrapState = {
+  databaseConfigured: false,
+  databasePasswordStored: false,
+  databaseConnected: false,
+  databaseSchemaReady: false,
+  securityPasswordConfigured: false,
+  hasAuthSession: false,
+  needsSetup: true,
+  lastDatabaseError: '',
+};
+
+function refreshBootstrapState(): void {
+  const config = readConfig();
+  bootstrapState = {
+    ...bootstrapState,
+    databaseConfigured: Boolean(config.databaseConfig),
+    databasePasswordStored: Boolean(config.databaseConfig?.password),
+    securityPasswordConfigured: config.securityPasswordConfigured,
+    hasAuthSession: Boolean(config.authSession?.token),
+    needsSetup:
+      !config.databaseConfig ||
+      !config.databaseConfig.password ||
+      !config.securityPasswordConfigured ||
+      !bootstrapState.databaseConnected ||
+      !bootstrapState.databaseSchemaReady,
+  };
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -216,6 +245,7 @@ async function ensureApiBaseUrl(): Promise<string> {
   const recentServerOutput: string[] = [];
   const port = await findAvailablePort(getApiPortHint());
   const databaseUrl = buildDatabaseUrl();
+  let databaseEnvUrl: string | undefined;
   const nodePath = buildNodePath(
     path.join(serverCwd, '..', 'node_modules'),
     path.join(process.resourcesPath, 'app.asar', 'node_modules'),
@@ -223,12 +253,31 @@ async function ensureApiBaseUrl(): Promise<string> {
   );
 
   apiBaseUrl = `http://127.0.0.1:${port}/api`;
+  refreshBootstrapState();
 
   if (databaseUrl) {
-    await runDatabaseSchemaUpgrade(serverCwd, databaseUrl);
+    try {
+      await runDatabaseSchemaUpgrade(serverCwd, databaseUrl);
+      databaseEnvUrl = databaseUrl;
+      bootstrapState.databaseConnected = true;
+      bootstrapState.databaseSchemaReady = true;
+      bootstrapState.lastDatabaseError = '';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      bootstrapState.databaseConnected = false;
+      bootstrapState.databaseSchemaReady = false;
+      bootstrapState.lastDatabaseError = message;
+      logError('db-upgrade', 'Database bootstrap failed; falling back to setup mode', error);
+    }
   } else {
+    bootstrapState.databaseConnected = false;
+    bootstrapState.databaseSchemaReady = false;
+    bootstrapState.lastDatabaseError = bootstrapState.databaseConfigured
+      ? 'Stored database configuration is incomplete. Please re-enter the database password.'
+      : '';
     logInfo('db-upgrade', 'Skipping database schema upgrade because no database is configured');
   }
+  refreshBootstrapState();
 
   logInfo('api-server', 'Starting embedded API server', { serverEntry, port, nodePath });
 
@@ -241,7 +290,8 @@ async function ensureApiBaseUrl(): Promise<string> {
       PORT: String(port),
       CORS_ORIGIN: appBaseUrl,
       NODE_PATH: nodePath,
-      ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+      INTERNAL_PASSWORD_RESET_TOKEN,
+      ...(databaseEnvUrl ? { DATABASE_URL: databaseEnvUrl } : {}),
     },
     stdio: 'pipe',
   });
@@ -325,6 +375,7 @@ async function ensureAppBaseUrl(): Promise<string> {
 
 async function createWindow(): Promise<void> {
   const baseUrl = await ensureAppBaseUrl();
+  const useCustomTitlebar = process.platform !== 'darwin';
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -333,7 +384,8 @@ async function createWindow(): Promise<void> {
     minHeight: 680,
     title: 'OtherOne',
     backgroundColor: '#f4f4f5',
-    autoHideMenuBar: process.platform === 'win32',
+    autoHideMenuBar: useCustomTitlebar,
+    frame: !useCustomTitlebar,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -346,7 +398,7 @@ async function createWindow(): Promise<void> {
     mainWindow?.show();
   });
 
-  if (process.platform === 'win32') {
+  if (useCustomTitlebar) {
     mainWindow.setMenuBarVisibility(false);
     mainWindow.setMenu(null);
   }
@@ -390,6 +442,20 @@ async function createWindow(): Promise<void> {
     if (hidePendingTimer) { clearTimeout(hidePendingTimer); hidePendingTimer = null; }
     showFloatingBallWindow();
   });
+
+  const sendWindowState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    mainWindow.webContents.send('window:state', {
+      isMaximized: mainWindow.isMaximized(),
+    });
+  };
+
+  mainWindow.on('maximize', sendWindowState);
+  mainWindow.on('unmaximize', sendWindowState);
+  mainWindow.once('ready-to-show', sendWindowState);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -451,7 +517,30 @@ function registerAppConfigIPC(): void {
       await restartApiServer();
     }
 
+    refreshBootstrapState();
+
     return { success: true };
+  });
+
+  ipcMain.handle('app-config:get-bootstrap', () => {
+    refreshBootstrapState();
+    return {
+      ...bootstrapState,
+      databaseConfig: readConfig().databaseConfig,
+    };
+  });
+
+  ipcMain.handle('app-config:save-security-password', (_event, data: { password: string }) => {
+    if (!data?.password || data.password.length < 6) {
+      throw new Error('Security password must be at least 6 characters.');
+    }
+    setSecurityPassword(data.password);
+    refreshBootstrapState();
+    return { success: true };
+  });
+
+  ipcMain.handle('app-config:verify-security-password', (_event, data: { password: string }) => {
+    return { success: verifySecurityPassword(data?.password ?? '') };
   });
 
   ipcMain.handle('app-auth:get-session', () => {
@@ -465,11 +554,74 @@ function registerAppConfigIPC(): void {
     const token = typeof data?.token === 'string' && data.token.length > 0 ? data.token : null;
     const user = data?.user && typeof data.user === 'object' ? data.user : null;
     writeConfig('authSession', { token, user });
+    refreshBootstrapState();
     return { success: true };
   });
 
   ipcMain.handle('app-auth:clear-session', () => {
     writeConfig('authSession', null);
+    refreshBootstrapState();
+    return { success: true };
+  });
+
+  ipcMain.on('window:minimize', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+
+  ipcMain.on('window:toggle-maximize', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) {
+      return;
+    }
+
+    if (window.isMaximized()) {
+      window.unmaximize();
+      return;
+    }
+
+    window.maximize();
+  });
+
+  ipcMain.on('window:close', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  ipcMain.handle('window:get-state', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+
+    return {
+      isMaximized: window?.isMaximized() ?? false,
+    };
+  });
+
+  ipcMain.handle('app-auth:reset-password', async (_event, data: {
+    email: string;
+    newPassword: string;
+    securityPassword: string;
+  }) => {
+    if (!verifySecurityPassword(data?.securityPassword ?? '')) {
+      throw new Error('Invalid security password.');
+    }
+
+    const baseUrl = await ensureApiBaseUrl();
+
+    const response = await fetch(`${baseUrl}/auth/reset-password-local`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-otherone-reset-token': INTERNAL_PASSWORD_RESET_TOKEN,
+      },
+      body: JSON.stringify({
+        email: data.email,
+        password: data.newPassword,
+      }),
+    });
+
+    const payload = await response.json() as { success?: boolean; message?: string };
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.message || 'Failed to reset password.');
+    }
+
     return { success: true };
   });
 }

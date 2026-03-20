@@ -134,6 +134,16 @@
     "emailPlaceholder": "m@example.com",
     "password": "Password",
     "forgotPassword": "Forgot password?",
+    "forgotTitle": "Reset account password",
+    "forgotDesc": "Enter the local security password for this device to set a new login password for this email.",
+    "forgotNewPassword": "New password",
+    "forgotSubmit": "Reset Password",
+    "forgotCancel": "Cancel",
+    "forgotSuccess": "Password reset. Please sign in with the new password.",
+    "forgotFailed": "Failed to reset password",
+    "forgotDesktopOnly": "Forgot password is only available in the desktop app",
+    "securityPassword": "Security password",
+    "securityPasswordPlaceholder": "Enter the security password configured during setup",
     "loginButton": "Sign in",
     "registerButton": "Create account",
     "termsPrefix": "By continuing you agree to our",
@@ -312,6 +322,10 @@
       "failed": "Connection failed",
       "detected": "Existing database connection detected",
       "detectedDesc": "A valid database configuration was found. You can skip this step or reconfigure.",
+      "checking": "Checking local database configuration...",
+      "passwordMissing": "A previous database configuration was found, but the password is missing",
+      "passwordMissingDesc": "Older versions did not preserve the password completely. Please enter the database password again and test the connection.",
+      "connectionIssue": "Database connection issue",
       "skip": "Skip",
       "reconfigure": "Reconfigure"
     },
@@ -324,9 +338,31 @@
       "initializing": "Initializing...",
       "success": "Database initialized successfully",
       "failed": "Initialization failed",
+      "checking": "Checking database structure...",
       "detected": "Database already initialized",
       "detectedDesc": "The required tables are already present in your database. You can skip this step.",
+      "autoUpgradePending": "Database structure needs an upgrade",
+      "autoUpgradePendingDesc": "The app will automatically fill in missing tables, columns, and indexes on startup. Save the database config or restart the app to apply it.",
       "skip": "Skip"
+    },
+    "securityPassword": {
+      "title": "Security Password",
+      "subtitle": "Set a local safety check",
+      "desc": "The security password is stored only on this device and is required for dangerous actions and password recovery.",
+      "label": "Security password",
+      "placeholder": "At least 6 characters",
+      "confirmLabel": "Confirm security password",
+      "confirmPlaceholder": "Enter it again",
+      "hint": "If you lose this security password, you will need to reopen setup and configure the local environment again.",
+      "detected": "A local security password is already configured",
+      "detectedDesc": "This device already has a security password. You can also update it here.",
+      "saveButton": "Save security password",
+      "updateButton": "Update security password",
+      "saved": "Security password saved",
+      "failed": "Failed to save security password",
+      "minLength": "Security password must be at least 6 characters",
+      "mismatch": "The security passwords do not match",
+      "desktopOnly": "Security password can only be configured in the desktop app"
     },
     "aiProvider": {
       "title": "AI Provider Configuration",
@@ -366,6 +402,10 @@
       "back": "Back",
       "next": "Next",
       "step": "Step {current} of {total}"
+    },
+    "bootstrap": {
+      "loading": "Loading local configuration...",
+      "failed": "Failed to load local configuration"
     }
   },
   "globalAi": {

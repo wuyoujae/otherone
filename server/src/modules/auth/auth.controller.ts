@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess, sendError } from '../../utils/response';
+import { env } from '../../config/env';
 import * as authService from './auth.service';
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -88,6 +89,47 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
     }
     const user = await authService.getProfile(req.user.userId);
     sendSuccess(res, user);
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'status' in error) {
+      const err = error as { status: number; message: string };
+      sendError(res, err.message, err.status);
+      return;
+    }
+    next(error);
+  }
+}
+
+export async function resetPasswordLocal(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const resetToken = req.headers['x-otherone-reset-token'];
+    if (!env.internalPasswordResetToken || resetToken !== env.internalPasswordResetToken) {
+      sendError(res, 'Unauthorized password reset request', 403);
+      return;
+    }
+
+    const { email, password } = req.body;
+
+    if (!email || typeof email !== 'string') {
+      sendError(res, 'Email is required');
+      return;
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 8) {
+      sendError(res, 'Password must be at least 8 characters');
+      return;
+    }
+
+    if (password.length > 128) {
+      sendError(res, 'Password must be 128 characters or less');
+      return;
+    }
+
+    await authService.resetPasswordLocal({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    sendSuccess(res, { success: true }, 'Password reset successful');
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'status' in error) {
       const err = error as { status: number; message: string };

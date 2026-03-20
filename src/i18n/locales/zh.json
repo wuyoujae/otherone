@@ -134,6 +134,16 @@
     "emailPlaceholder": "m@example.com",
     "password": "密码",
     "forgotPassword": "忘记密码？",
+    "forgotTitle": "重置账号密码",
+    "forgotDesc": "输入本机安全密码后，可以为当前邮箱重新设置登录密码。",
+    "forgotNewPassword": "新密码",
+    "forgotSubmit": "重置密码",
+    "forgotCancel": "取消",
+    "forgotSuccess": "密码已重置，请使用新密码登录",
+    "forgotFailed": "密码重置失败",
+    "forgotDesktopOnly": "忘记密码功能仅支持桌面端",
+    "securityPassword": "安全密码",
+    "securityPasswordPlaceholder": "输入初始化时设置的安全密码",
     "loginButton": "登录账户",
     "registerButton": "注册并开启旅程",
     "termsPrefix": "点击继续即表示您同意我们的",
@@ -312,6 +322,10 @@
       "failed": "连接失败",
       "detected": "检测到已有数据库配置",
       "detectedDesc": "发现有效的数据库配置，你可以跳过此步骤或重新配置。",
+      "checking": "正在检查本地数据库配置...",
+      "passwordMissing": "检测到历史数据库配置，但缺少密码",
+      "passwordMissingDesc": "旧版本不会完整保存密码，请重新输入数据库密码并测试连接。",
+      "connectionIssue": "数据库连接异常",
       "skip": "跳过",
       "reconfigure": "重新配置"
     },
@@ -324,9 +338,31 @@
       "initializing": "初始化中...",
       "success": "数据库初始化成功",
       "failed": "初始化失败",
+      "checking": "正在检查数据库结构...",
       "detected": "数据库已初始化",
       "detectedDesc": "数据库中已存在所需的表结构，你可以跳过此步骤。",
+      "autoUpgradePending": "检测到数据库结构需要升级",
+      "autoUpgradePendingDesc": "应用启动时会自动补齐缺失的表、字段和索引。完成数据库保存或重新启动后会自动生效。",
       "skip": "跳过"
+    },
+    "securityPassword": {
+      "title": "安全密码",
+      "subtitle": "设置本机安全校验",
+      "desc": "安全密码仅存储在本机，用于危险操作和忘记密码时重置账号密码。",
+      "label": "安全密码",
+      "placeholder": "至少 6 位",
+      "confirmLabel": "确认安全密码",
+      "confirmPlaceholder": "再次输入安全密码",
+      "hint": "如果丢失安全密码，需要重新打开引导页并重新配置本地环境。",
+      "detected": "已检测到本机安全密码",
+      "detectedDesc": "当前设备已经配置过安全密码，你也可以在这里重新设置。",
+      "saveButton": "保存安全密码",
+      "updateButton": "更新安全密码",
+      "saved": "安全密码已保存",
+      "failed": "保存安全密码失败",
+      "minLength": "安全密码至少需要 6 位",
+      "mismatch": "两次输入的安全密码不一致",
+      "desktopOnly": "安全密码仅支持桌面端配置"
     },
     "aiProvider": {
       "title": "AI 服务配置",
@@ -366,6 +402,10 @@
       "back": "上一步",
       "next": "下一步",
       "step": "第 {current} 步，共 {total} 步"
+    },
+    "bootstrap": {
+      "loading": "正在读取本地配置...",
+      "failed": "读取本地配置失败"
     }
   },
   "globalAi": {

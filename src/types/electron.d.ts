@@ -24,6 +24,24 @@ export interface AuthSession {
   user: Record<string, unknown> | null;
 }
 
+export interface BootstrapStatus {
+  databaseConfigured: boolean;
+  databasePasswordStored: boolean;
+  databaseConnected: boolean;
+  databaseSchemaReady: boolean;
+  securityPasswordConfigured: boolean;
+  hasAuthSession: boolean;
+  needsSetup: boolean;
+  lastDatabaseError: string;
+  databaseConfig: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    database: string;
+  } | null;
+}
+
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
