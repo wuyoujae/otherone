@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --desktop-titlebar-height: 0px;
   --surface: #ffffff;
   --surface-subtle: #f4f4f5;
   --surface-hover: #f1f5f9;
@@ -18,6 +19,22 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
+}
+
+.desktop-shell-height {
+  height: calc(100vh - var(--desktop-titlebar-height, 0px));
+}
+
+.desktop-shell-min-height {
+  min-height: calc(100vh - var(--desktop-titlebar-height, 0px));
+}
+
+.desktop-titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+.desktop-titlebar-no-drag {
+  -webkit-app-region: no-drag;
 }
 
 /* Scrollbar */

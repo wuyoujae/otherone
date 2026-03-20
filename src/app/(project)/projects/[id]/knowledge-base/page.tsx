@@ -11,7 +11,7 @@ export default function KnowledgeBasePage() {
   const t = useTranslations('plugins');
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="desktop-shell-height flex flex-col overflow-hidden bg-surface">
       <header className="flex items-center gap-4 px-6 md:px-12 pt-6 pb-4 bg-white/90 backdrop-blur-xl border-b border-[var(--border)]">
         <button
           onClick={() => router.push(`/projects/${projectId}`)}

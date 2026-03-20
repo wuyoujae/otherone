@@ -6,5 +6,6 @@ export declare const env: {
     readonly corsOrigin: string;
     readonly jwtSecret: string;
     readonly jwtExpiresIn: string;
+    readonly internalPasswordResetToken: string;
 };
 //# sourceMappingURL=env.d.ts.map

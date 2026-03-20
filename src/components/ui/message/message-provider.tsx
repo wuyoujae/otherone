@@ -164,7 +164,7 @@ export function MessageProvider({ children }: { children: ReactNode }) {
       {children}
 
       {/* Toast container */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 pointer-events-none">
+      <div className="fixed left-1/2 top-[calc(var(--desktop-titlebar-height,0px)+1rem)] z-[9999] flex -translate-x-1/2 flex-col items-center gap-2 pointer-events-none">
         {toasts.map((toast) => {
           const Icon = iconMap[toast.type];
           return (

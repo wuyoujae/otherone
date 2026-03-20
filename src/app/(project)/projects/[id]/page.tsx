@@ -87,7 +87,7 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-surface">
+      <div className="desktop-shell-height flex items-center justify-center bg-surface">
         <div className="w-5 h-5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -95,7 +95,7 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-surface gap-4">
+      <div className="desktop-shell-height flex flex-col items-center justify-center gap-4 bg-surface">
         <FolderOpen size={32} className="text-foreground-lighter" />
         <p className="text-foreground-muted">Project not found</p>
         <button onClick={() => router.push('/projects')} className="text-sm text-foreground underline">
@@ -112,7 +112,7 @@ export default function ProjectDetailPage() {
       : 'Idle';
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="desktop-shell-height flex flex-col overflow-hidden bg-surface">
       <header className="px-6 md:px-12 pt-6 bg-white/90 backdrop-blur-xl relative z-10">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">

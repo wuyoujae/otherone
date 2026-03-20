@@ -15,5 +15,6 @@ exports.env = {
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3002',
     jwtSecret: process.env.JWT_SECRET || 'otherone-dev-secret-change-in-production',
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    internalPasswordResetToken: process.env.INTERNAL_PASSWORD_RESET_TOKEN || '',
 };
 //# sourceMappingURL=env.js.map

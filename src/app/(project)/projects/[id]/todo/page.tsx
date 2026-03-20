@@ -296,7 +296,7 @@ export default function TodoPage() {
   ];
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="desktop-shell-height flex flex-col overflow-hidden bg-surface">
       <header className="flex flex-col px-6 md:px-10 pt-6 bg-white/90 backdrop-blur-xl border-b border-[var(--border)] relative z-10">
         <div className="flex items-center gap-4 mb-5">
           <button onClick={() => router.push(`/projects/${projectId}`)} className="text-foreground-muted transition-all hover:text-foreground hover:-translate-x-0.5">

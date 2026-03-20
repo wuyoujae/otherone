@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.register = register;
 exports.login = login;
 exports.getProfile = getProfile;
+exports.resetPasswordLocal = resetPasswordLocal;
 const crypto_1 = __importDefault(require("crypto"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -65,5 +66,20 @@ async function getProfile(userId) {
         throw { status: 404, message: 'User not found' };
     }
     return sanitizeUser(user);
+}
+async function resetPasswordLocal(input) {
+    const user = await database_1.default.user.findUnique({ where: { email: input.email } });
+    if (!user) {
+        throw { status: 404, message: 'User not found' };
+    }
+    const passwordHash = await bcryptjs_1.default.hash(input.password, SALT_ROUNDS);
+    await database_1.default.user.update({
+        where: { id: user.id },
+        data: {
+            passwordHash,
+            updatedAt: new Date(),
+        },
+    });
+    return { success: true };
 }
 //# sourceMappingURL=auth.service.js.map

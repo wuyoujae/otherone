@@ -478,14 +478,14 @@ export default function CraftPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-surface">
+      <div className="desktop-shell-height flex items-center justify-center bg-surface">
         <div className="w-5 h-5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface">
+    <div className="desktop-shell-height flex overflow-hidden bg-surface">
       {/* Sidebar */}
       <aside
         className={cn(

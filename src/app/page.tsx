@@ -61,7 +61,7 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface">
+    <div className="desktop-shell-height flex items-center justify-center bg-surface">
       <div className="flex items-center gap-3 text-sm text-foreground-muted">
         <Loader2 size={18} className="animate-spin" />
         <span>Loading workspace...</span>

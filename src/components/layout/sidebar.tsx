@@ -64,7 +64,7 @@ export function Sidebar() {
     <>
       {/* Mobile menu button */}
       <button
-        className="fixed top-5 left-4 z-[60] md:hidden p-2 rounded-lg bg-surface border border-[var(--border)] shadow-sm hover:bg-surface-hover transition-colors"
+        className="fixed left-4 top-[calc(var(--desktop-titlebar-height,0px)+1rem)] z-[60] md:hidden p-2 rounded-lg bg-surface border border-[var(--border)] shadow-sm hover:bg-surface-hover transition-colors"
         onClick={() => setMobileOpen(true)}
         aria-label="Open menu"
       >
@@ -84,8 +84,8 @@ export function Sidebar() {
         className={cn(
           'bg-surface border-r border-[var(--border)] flex flex-col',
           'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-          'fixed inset-y-0 left-0 z-50 w-[260px]',
-          'md:relative md:z-10',
+          'fixed bottom-0 left-0 top-[var(--desktop-titlebar-height,0px)] z-50 w-[260px]',
+          'md:relative md:top-0 md:z-10',
           collapsed ? 'md:w-[80px]' : 'md:w-[260px]',
           mobileOpen
             ? 'translate-x-0 shadow-xl'

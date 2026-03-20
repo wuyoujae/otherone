@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,22 +26,43 @@ def ensure_resources_dir() -> None:
 
 def render_master_png() -> Path:
     master_png = RESOURCES_DIR / "icon-1024.png"
-    quicklook_output = RESOURCES_DIR / f"{SOURCE_SVG.name}.png"
+    size = 1024
+    scale = size / 88
 
-    if quicklook_output.exists():
-        quicklook_output.unlink()
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
 
-    subprocess.run(
-        ["qlmanage", "-t", "-s", "1024", "-o", str(RESOURCES_DIR), str(SOURCE_SVG)],
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    stroke_width = round(3.2 * scale)
+    main_radius = 40 * scale
+    eye_radius = 4.5 * scale
+    center = 44 * scale
+
+    draw.ellipse(
+        (
+            center - main_radius,
+            center - main_radius,
+            center + main_radius,
+            center + main_radius,
+        ),
+        fill=(255, 255, 255, 255),
+        outline=(0, 0, 0, 255),
+        width=stroke_width,
     )
 
-    if not quicklook_output.exists():
-        raise RuntimeError(f"Failed to render {SOURCE_SVG.name} with qlmanage")
+    for eye_x in (30, 58):
+        x = eye_x * scale
+        y = 26 * scale
+        draw.ellipse(
+            (
+                x - eye_radius,
+                y - eye_radius,
+                x + eye_radius,
+                y + eye_radius,
+            ),
+            fill=(0, 0, 0, 255),
+        )
 
-    quicklook_output.replace(master_png)
+    image.save(master_png, format="PNG")
     return master_png
 
 

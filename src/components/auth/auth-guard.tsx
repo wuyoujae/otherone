@@ -34,7 +34,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!authorized) {
     return (
-      <div className="flex h-screen items-center justify-center bg-surface-subtle">
+      <div className="desktop-shell-height flex items-center justify-center bg-surface-subtle">
         <div className="w-5 h-5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
       </div>
     );

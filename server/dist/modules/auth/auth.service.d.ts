@@ -7,6 +7,10 @@ export interface LoginInput {
     email: string;
     password: string;
 }
+export interface ResetPasswordInput {
+    email: string;
+    password: string;
+}
 export declare function register(input: RegisterInput): Promise<{
     token: string;
     user: {
@@ -33,5 +37,8 @@ export declare function getProfile(userId: string): Promise<{
     email: string;
     avatarUrl: string | null;
     createdAt: Date;
+}>;
+export declare function resetPasswordLocal(input: ResetPasswordInput): Promise<{
+    success: boolean;
 }>;
 //# sourceMappingURL=auth.service.d.ts.map
