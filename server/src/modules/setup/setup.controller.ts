@@ -102,7 +102,7 @@ export async function checkTables(req: Request, res: Response): Promise<void> {
     const tables = await prisma.$queryRaw<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public'
     `;
-    const tableNames = tables.map((t) => t.tablename);
+    const tableNames = tables.map((t: { tablename: string }) => t.tablename);
     const allPresent = REQUIRED_TABLES.every((table) => tableNames.includes(table));
 
     sendSuccess(res, {
