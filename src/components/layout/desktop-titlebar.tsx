@@ -1,21 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Minus, Square, X } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import { getElectronAPI } from '@/lib/electron';
 import { cn } from '@/lib/utils';
 
 const TITLEBAR_HEIGHT = 72;
-
-const routeLabels: Array<{ match: RegExp; title: string; eyebrow: string }> = [
-  { match: /^\/dashboard/, title: 'Command View', eyebrow: 'Workspace' },
-  { match: /^\/task-design/, title: 'Task Atelier', eyebrow: 'Planning' },
-  { match: /^\/projects/, title: 'Project Gallery', eyebrow: 'Delivery' },
-  { match: /^\/settings/, title: 'System Settings', eyebrow: 'Preferences' },
-  { match: /^\/login/, title: 'Welcome Back', eyebrow: 'Access' },
-  { match: /^\/setup/, title: 'Launch Sequence', eyebrow: 'Onboarding' },
-];
 
 function WindowControlButton({
   label,
@@ -83,7 +73,6 @@ function detectPlatform(): string {
 
 export function DesktopTitlebar() {
   const [isMaximized, setIsMaximized] = useState(false);
-  const pathname = usePathname();
   const platform = detectPlatform();
   const visible = platform === 'win32' || platform === 'linux';
 
@@ -124,13 +113,6 @@ export function DesktopTitlebar() {
     };
   }, [visible]);
 
-  const currentRoute = useMemo(() => {
-    return routeLabels.find((route) => route.match.test(pathname)) ?? {
-      title: 'Creative Workspace',
-      eyebrow: 'Desktop',
-    };
-  }, [pathname]);
-
   if (!visible) {
     return null;
   }
@@ -141,34 +123,20 @@ export function DesktopTitlebar() {
     <header className="desktop-titlebar-drag sticky top-0 z-[120] flex h-[var(--desktop-titlebar-height)] shrink-0 items-center px-3 py-3">
       <div className="pointer-events-none absolute inset-x-4 bottom-0 h-px bg-gradient-to-r from-transparent via-black/10 to-transparent" />
 
-      <div className="relative flex h-full w-full items-center justify-between overflow-hidden rounded-[26px] border border-black/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,255,255,0.72)_42%,rgba(244,244,245,0.96))] px-4 shadow-[0_22px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-2xl">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.9),transparent_34%),linear-gradient(120deg,rgba(15,23,42,0.02),transparent_45%,rgba(15,23,42,0.06))]" />
+      <div className="relative flex h-full w-full items-center justify-between overflow-hidden rounded-[24px] border border-black/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(244,244,245,0.86))] px-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.72),transparent_32%)]" />
 
         <div className="relative z-[1] flex min-w-0 items-center gap-3">
-          <div className="flex items-center gap-3 rounded-[20px] border border-black/8 bg-white/55 px-3 py-2 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.65)] backdrop-blur-xl">
-            <div className="relative h-11 w-11 overflow-hidden rounded-[18px] border border-black/10 bg-[linear-gradient(145deg,#0f172a,#18181b_58%,#404040)] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_16px_30px_-18px_rgba(15,23,42,0.7)]">
-              <div className="absolute inset-[5px] rounded-[14px] bg-[linear-gradient(145deg,rgba(255,255,255,0.9),rgba(244,244,245,0.72))]" />
-              <div className="absolute left-[10px] top-[10px] h-[13px] w-[13px] rounded-full bg-zinc-950 shadow-[0_0_0_4px_rgba(255,255,255,0.55)]" />
-              <div className="absolute right-[9px] top-[9px] h-[16px] w-[16px] rounded-[5px] border border-zinc-900/70 bg-white/80" />
-              <div className="absolute bottom-[10px] left-[10px] right-[10px] h-[9px] rounded-full bg-[linear-gradient(90deg,#111827,#52525b)]" />
+          <div className="flex items-center gap-3 rounded-[18px] bg-white/45 px-2.5 py-2">
+            <div className="relative h-10 w-10 overflow-hidden rounded-[16px] border border-black/10 bg-[linear-gradient(145deg,#111827,#27272a)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_12px_24px_-18px_rgba(15,23,42,0.7)]">
+              <div className="absolute inset-[4px] rounded-[12px] bg-[linear-gradient(145deg,rgba(255,255,255,0.88),rgba(244,244,245,0.7))]" />
+              <div className="absolute left-[9px] top-[9px] h-[12px] w-[12px] rounded-full bg-zinc-950 shadow-[0_0_0_3px_rgba(255,255,255,0.5)]" />
+              <div className="absolute right-[8px] top-[8px] h-[15px] w-[15px] rounded-[5px] border border-zinc-900/70 bg-white/75" />
+              <div className="absolute bottom-[9px] left-[9px] right-[9px] h-[8px] rounded-full bg-[linear-gradient(90deg,#111827,#52525b)]" />
             </div>
 
-            <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                OtherOne
-              </p>
-              <p className="truncate text-[15px] font-semibold tracking-[-0.03em] text-zinc-950">
-                Creative Control Deck
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden min-w-0 items-center gap-2 rounded-full border border-black/8 bg-black/[0.03] px-3 py-2 text-[12px] md:flex">
-            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-            <span className="truncate font-medium text-zinc-500">{currentRoute.eyebrow}</span>
-            <span className="h-1 w-1 rounded-full bg-zinc-300" />
-            <span className="truncate font-semibold tracking-[-0.01em] text-zinc-900">
-              {currentRoute.title}
+            <span className="truncate text-[16px] font-semibold tracking-[-0.04em] text-zinc-950">
+              OtherOne
             </span>
           </div>
         </div>
