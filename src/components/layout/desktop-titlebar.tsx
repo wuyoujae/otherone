@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Minus, Square, X } from 'lucide-react';
+import Image from 'next/image';
 import { getElectronAPI } from '@/lib/electron';
 import { cn } from '@/lib/utils';
 
@@ -128,11 +129,8 @@ export function DesktopTitlebar() {
 
         <div className="relative z-[1] flex min-w-0 items-center gap-3">
           <div className="flex items-center gap-3 rounded-[18px] bg-white/45 px-2.5 py-2">
-            <div className="relative h-10 w-10 overflow-hidden rounded-[16px] border border-black/10 bg-[linear-gradient(145deg,#111827,#27272a)] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_12px_24px_-18px_rgba(15,23,42,0.7)]">
-              <div className="absolute inset-[4px] rounded-[12px] bg-[linear-gradient(145deg,rgba(255,255,255,0.88),rgba(244,244,245,0.7))]" />
-              <div className="absolute left-[9px] top-[9px] h-[12px] w-[12px] rounded-full bg-zinc-950 shadow-[0_0_0_3px_rgba(255,255,255,0.5)]" />
-              <div className="absolute right-[8px] top-[8px] h-[15px] w-[15px] rounded-[5px] border border-zinc-900/70 bg-white/75" />
-              <div className="absolute bottom-[9px] left-[9px] right-[9px] h-[8px] rounded-full bg-[linear-gradient(90deg,#111827,#52525b)]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-[16px] border border-black/8 bg-white/80 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)]">
+              <Image src="/otherone-icon.svg" alt="OtherOne" width={24} height={24} className="h-6 w-6" />
             </div>
 
             <span className="truncate text-[16px] font-semibold tracking-[-0.04em] text-zinc-950">
