@@ -54,10 +54,39 @@ async function findAvailablePort(startPort = 3002): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function waitForServer(url: string, timeoutMs = 20000): Promise<void> {
+function buildEmbeddedServerNodePath(serverCwd: string): string {
+  const existingNodePath = process.env.NODE_PATH;
+  const entries = [
+    path.join(serverCwd, 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar', 'node_modules'),
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules'),
+    existingNodePath,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return Array.from(new Set(entries)).join(path.delimiter);
+}
+
+function formatServerExitMessage(serverProcess: ChildProcess, recentServerOutput: string[]): string {
+  const output = recentServerOutput.length > 0
+    ? ` Recent server output: ${recentServerOutput[recentServerOutput.length - 1]}`
+    : '';
+
+  return `Embedded app server exited before becoming ready (code: ${serverProcess.exitCode ?? 'unknown'}, signal: ${serverProcess.signalCode ?? 'none'}).${output}`;
+}
+
+async function waitForEmbeddedServerReady(
+  serverProcess: ChildProcess,
+  url: string,
+  recentServerOutput: string[],
+  timeoutMs = 20000,
+): Promise<void> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
+    if (serverProcess.exitCode !== null || serverProcess.signalCode !== null) {
+      throw new Error(formatServerExitMessage(serverProcess, recentServerOutput));
+    }
+
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -84,10 +113,12 @@ async function ensureAppBaseUrl(): Promise<string> {
 
   const serverEntry = path.join(process.resourcesPath, 'app', 'server.js');
   const serverCwd = path.dirname(serverEntry);
+  const recentServerOutput: string[] = [];
   const port = await findAvailablePort();
+  const nodePath = buildEmbeddedServerNodePath(serverCwd);
 
   appBaseUrl = `http://127.0.0.1:${port}`;
-  logInfo('next-server', 'Starting embedded Next.js server', { serverEntry, port });
+  logInfo('next-server', 'Starting embedded Next.js server', { serverEntry, port, nodePath });
 
   appServerProcess = spawn(process.execPath, [serverEntry], {
     cwd: serverCwd,
@@ -97,13 +128,22 @@ async function ensureAppBaseUrl(): Promise<string> {
       NODE_ENV: 'production',
       PORT: String(port),
       HOSTNAME: '127.0.0.1',
+      NODE_PATH: nodePath,
     },
     stdio: 'pipe',
   });
 
+  const rememberServerOutput = (message: string) => {
+    recentServerOutput.push(message);
+    if (recentServerOutput.length > 10) {
+      recentServerOutput.shift();
+    }
+  };
+
   appServerProcess.stdout?.on('data', (chunk) => {
     const message = chunk.toString().trim();
     if (message) {
+      rememberServerOutput(message);
       console.log(`[next] ${message}`);
       logInfo('next-server', message);
     }
@@ -112,6 +152,7 @@ async function ensureAppBaseUrl(): Promise<string> {
   appServerProcess.stderr?.on('data', (chunk) => {
     const message = chunk.toString().trim();
     if (message) {
+      rememberServerOutput(message);
       console.error(`[next] ${message}`);
       logError('next-server', message);
     }
@@ -123,7 +164,7 @@ async function ensureAppBaseUrl(): Promise<string> {
     appServerProcess = null;
   });
 
-  await waitForServer(appBaseUrl);
+  await waitForEmbeddedServerReady(appServerProcess, appBaseUrl, recentServerOutput);
   logInfo('next-server', 'Embedded Next.js server is ready', { url: appBaseUrl });
   return appBaseUrl;
 }
