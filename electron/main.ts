@@ -268,6 +268,7 @@ async function createWindow(): Promise<void> {
     minHeight: 680,
     title: 'OtherOne',
     backgroundColor: '#f4f4f5',
+    autoHideMenuBar: process.platform === 'win32',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -279,6 +280,11 @@ async function createWindow(): Promise<void> {
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
+
+  if (process.platform === 'win32') {
+    mainWindow.setMenuBarVisibility(false);
+    mainWindow.setMenu(null);
+  }
 
   attachWindowLogging(mainWindow, 'main');
 
