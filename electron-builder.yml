@@ -28,6 +28,10 @@ extraResources:
     to: api-server/node_modules
     filter:
       - "**/*"
+  - from: server/node_modules/.prisma
+    to: api-server/node_modules/.prisma
+    filter:
+      - "**/*"
   - from: server/prisma
     to: api-server/prisma
     filter:
